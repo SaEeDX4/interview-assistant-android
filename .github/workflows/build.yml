@@ -1,0 +1,19 @@
+# CI scaffolding (TRANSFER-MAP §7 P1): build + unit tests + asset checksums + mapping checks.
+# The checksum and mapping-table jobs are added as the parity assets land (P3+).
+name: build
+on:
+  push:
+  pull_request:
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "17"
+      - uses: gradle/actions/setup-gradle@v4
+      - run: gradle :app:assembleDebug :core:testDebugUnitTest :client:testDebugUnitTest :contracts:testDebugUnitTest
+      - name: Verify shared assets are byte-identical (checksums)
+        run: cd parity && sha256sum -c assets.sha256
