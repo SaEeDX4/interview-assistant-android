@@ -1,0 +1,14 @@
+*.iml
+.gradle
+/local.properties
+/.idea
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/*/build
+/*/out
+# Windows reference clone must never be committed to the Android repo
+/windows-reference/
