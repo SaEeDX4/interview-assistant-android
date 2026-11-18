@@ -1,6 +1,7 @@
 plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
@@ -20,6 +21,8 @@ android {
 }
 
 // TRANSFER-MAP §6.1: :core depends on NOTHING (mirrors InterviewAssistant.Core project references).
+// kotlinx.serialization is the BCL-JSON counterpart (Loc's table parsing), from the existing catalog.
 dependencies {
     implementation(libs.kotlinx.coroutines.android)
+    implementation(libs.kotlinx.serialization.json)
 }
