@@ -35,6 +35,7 @@ import kotlinx.coroutines.isActive
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerializationException
+import kotlinx.serialization.serializer
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.jsonObject
@@ -178,14 +179,14 @@ class BackendClient(
         val raw = sendRaw("POST", "answers/stream", jsonBody(request), auth = true, buffered = false)
         val resp = raw.response!!
         if (!resp.isSuccessful) {
-            val error = toError(resp.code, resp.body.string())
+            val error = toError(resp.code, requireNotNull(resp.body).string())
             resp.close()
             throw error
         }
         return AnswerStreamSession(resp, lastCorrelationId)
     }
 
-    private inline fun <reified T> jsonBody(value: T): String = Json.encodeToString(value)
+    private inline fun <reified T> jsonBody(value: T): String = Json.encodeToString(serializer<T>(), value)
 
     private suspend inline fun <reified T> send(method: String, path: String, bodyJson: String?, auth: Boolean = true): T {
         val result = sendNullable<T>(method, path, bodyJson, auth)
@@ -225,7 +226,7 @@ class BackendClient(
                 if (buffered) {
                     // ResponseContentRead in the C#: headers + body, all inside the timeout.
                     val (code, text) = withTimeout(requestTimeout) {
-                        call.executeAsync().use { r -> r.code to r.body.string() }
+                        call.executeAsync().use { r -> r.code to requireNotNull(r.body).string() }
                     }
                     if (code == 401 && auth && attempt == 0) {
                         attempt++
@@ -286,7 +287,7 @@ class AnswerStreamSession internal constructor(
     private val response: Response,
     private val correlationId: String?,
 ) : AutoCloseable {
-    private val reader = response.body.byteStream().bufferedReader()
+    private val reader = requireNotNull(response.body).byteStream().bufferedReader()
     private var event: String? = null
     private var finished = false
 
@@ -319,6 +320,8 @@ class AnswerStreamSession internal constructor(
                 val delta = ContractJson.instance.parseToJsonElement(data).jsonObject["delta"]?.jsonPrimitive?.content
                 if (!delta.isNullOrEmpty()) return@withContext delta
             }
+            @Suppress("UNREACHABLE_CODE")
+            throw IllegalStateException("unreachable: the stream loop only exits via return or throw")
         }
     }
 
