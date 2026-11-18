@@ -1,9 +1,12 @@
 package com.interviewassistant.core.intelligence
 
 /**
- * Mirror target of `InterviewAssistant.Core/Intelligence/PromptBuilder.cs` (TRANSFER-MAP §2, layer: Mirror).
+ * Mirror of `InterviewAssistant.Core/Intelligence/PromptBuilder.cs` (TRANSFER-MAP §2, layer: Mirror).
  *
- * P1 PLACEHOLDER — structure only. The 1:1 Kotlin port lands in Phase P3 with its parity tests
- * (TRANSFER-MAP §5). Behaviour must match the Windows file point-by-point; do not invent behaviour here.
+ * P2 slice: [ChatMessage] only — it is the one type from this file that `:client` consumes
+ * (`CloudAnswerProvider`). `ConversationTurn`, `PromptRequest` and the `PromptBuilder` class itself are
+ * ported in Phase P3 with the rest of the Intelligence package (TRANSFER-MAP §7); they are not stubbed
+ * here, they are simply not part of this file yet.
  */
-internal object PromptBuilderMirrorPlaceholder
+
+data class ChatMessage(val role: String, val content: String)
