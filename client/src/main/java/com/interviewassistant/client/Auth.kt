@@ -216,7 +216,7 @@ class SupabaseAuth(
         )
         val body = send(req).use { resp ->
             if (!resp.isSuccessful) throw fail(resp, Loc.t("auth_create_failed"))
-            resp.body.string()
+            requireNotNull(resp.body).string()
         }
         if (body.contains("\"access_token\"")) {
             storeTokens(body)
@@ -395,7 +395,7 @@ class SupabaseAuth(
     private suspend fun tokenRequest(req: Request, accept: ((AuthSession) -> Boolean)? = null): AuthSession {
         val body = send(req).use { resp ->
             if (!resp.isSuccessful) throw fail(resp, Loc.t("err_sign_in_failed"))
-            resp.body.string()
+            requireNotNull(resp.body).string()
         }
         return storeTokens(body, accept)
     }
@@ -425,7 +425,7 @@ class SupabaseAuth(
         var code = "http_" + resp.code
         var msg = fallback
         try {
-            val root = tokenJson.parseToJsonElement(resp.body.string()).jsonObject
+            val root = tokenJson.parseToJsonElement(resp.body?.string() ?: "").jsonObject
             (root["error_code"] ?: root["error"])?.let { c ->
                 if (c is kotlinx.serialization.json.JsonPrimitive && c.isString) code = c.content
             }
