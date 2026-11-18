@@ -9,10 +9,24 @@
         android:theme="@android:style/Theme.Material.NoActionBar">
         <activity
             android:name=".MainActivity"
-            android:exported="true">
+            android:exported="true"
+            android:launchMode="singleTop">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <!-- OAuth redirect surface (§8 D5): the custom-scheme fallback for the Windows loopback
+                 listener. The verified-https App Link filter is added when the operator's redirect
+                 host is pinned (see P2-PORT-NOTES.md); the shared RedirectUriParser enforces the
+                 /callback path + PKCE state on either surface. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data
+                    android:scheme="interviewassistant"
+                    android:host="oauth"
+                    android:path="/callback" />
             </intent-filter>
         </activity>
     </application>
