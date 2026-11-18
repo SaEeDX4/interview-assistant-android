@@ -21,10 +21,13 @@ android {
 }
 
 // TRANSFER-MAP §6.1: :client -> :core, :contracts (mirrors InterviewAssistant.Client references).
+// api (not implementation) for the two project references: the client's public API exposes Core and
+// Contracts types in its signatures, exactly like the transitive C# ProjectReference.
 dependencies {
-    implementation(project(":core"))
-    implementation(project(":contracts"))
+    api(project(":core"))
+    api(project(":contracts"))
     implementation(libs.okhttp)
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
+    testImplementation(libs.junit)
 }
