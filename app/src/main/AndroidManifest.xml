@@ -1,6 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- P5 live audio: capture runs only inside the microphone-typed foreground service;
+         permissions are requested at a capture start, never at app start. -->
+    <uses-permission android:name="android.permission.RECORD_AUDIO" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
+
     <application
         android:name=".InterviewAssistantApplication"
         android:allowBackup="true"
@@ -10,7 +18,9 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:launchMode="singleTop">
+            android:launchMode="singleTop"
+            android:supportsPictureInPicture="true"
+            android:configChanges="orientation|screenSize|smallestScreenSize|screenLayout|keyboardHidden">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
@@ -29,6 +39,14 @@
                     android:path="/callback" />
             </intent-filter>
         </activity>
+        <!-- The P5 foreground service (TRANSFER-MAP §6.2 audio row, §8 D12): keeps capture and
+             the live session alive under the persistent notification whose actions are the D2
+             shortcut surface. The mediaProjection type is asserted only while playback capture
+             runs; the service is started with the types the current capture actually uses. -->
+        <service
+            android:name=".platform.CaptureForegroundService"
+            android:exported="false"
+            android:foregroundServiceType="microphone|mediaProjection" />
         <!-- Sharing the app's own files with viewer apps (report copies, the log folder) goes
              through a FileProvider; no other app gets a raw file path (P4-E shell wiring). -->
         <provider
