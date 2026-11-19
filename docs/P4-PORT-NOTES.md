@@ -1179,3 +1179,10 @@ call sites; the property and its notifications are unchanged; C# keeps both beca
 C# properties and methods do not share a JVM-style signature). A file-level sweep
 for the same pattern flagged HomeRows' HomeClipboard.setText — a false positive
 (interface method, different type from InlineMessageState.text).
+
+### P4-C3 CI fix round 3 (DC-120, continued)
+
+Run #218 on head 6d668a3: main code compiled; test compilation failed in
+HomeRelocalizationTests — the language pickers are LangItem(label, code) (HomeRows),
+and the test read .value (the ListItem member) instead of .code. Test-side member
+name corrected at both assertions; the asserted values ("auto"/"same") are unchanged.
