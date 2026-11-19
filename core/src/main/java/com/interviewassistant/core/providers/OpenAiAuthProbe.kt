@@ -42,7 +42,7 @@ object OpenAiAuthProbe {
                 suspendCancellableCoroutine { cont ->
                     call.enqueue(object : Callback {
                         override fun onFailure(call: Call, e: IOException) {
-                            if (cont.isActive) cont.resumeWith(Result.failure(e))
+                            if (cont.isActive) cont.resumeWith(kotlin.Result.failure(e))
                         }
 
                         override fun onResponse(call: Call, response: Response) {
