@@ -35,6 +35,13 @@ enum class IaGlyph(val codePoint: Int, @DrawableRes val drawable: Int) {
     Chevron(0xE70D, R.drawable.ic_glyph_chevron),
     Info(0xE946, R.drawable.ic_glyph_info),
     Error(0xEA39, R.drawable.ic_glyph_error),
+    // Added in P4-E (DC-144, additive only): the fact-row edit/delete actions and the Reports
+    // empty/select states use these Segoe code points in the original; P4-D shipped no drawable
+    // for them because no P4-D surface needed one.
+    Edit(0xE70F, R.drawable.ic_glyph_edit),
+    Delete(0xE74D, R.drawable.ic_glyph_delete),
+    List(0xE8FD, R.drawable.ic_glyph_list),
+    Report(0xE9F9, R.drawable.ic_glyph_report),
 }
 
 /** Draws one [IaGlyph] at [size] with [tint] (the XAML renders the glyph font at a font size; here, a square box). */
