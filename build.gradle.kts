@@ -17,9 +17,10 @@ subprojects {
     tasks.withType<Test>().configureEach {
         testLogging {
             events("started", "passed", "skipped", "failed")
+            showStandardStreams = true // TEMP-DIAG
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             showStackTraces = true
         }
-        timeout.set(java.time.Duration.ofMinutes(10))
+        timeout.set(java.time.Duration.ofMinutes(4) // TEMP-DIAG)
     }
 }
