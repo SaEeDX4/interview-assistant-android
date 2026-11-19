@@ -626,12 +626,35 @@ class InterviewEngine(
         replaces: AnswerView? = null,
         heard: HeardEvidence? = null,
     ) {
+        // DC-54: the per-answer Job is a CHILD of the caller's job; a bare Job that is never
+        // completed keeps the parent (e.g. a test's runBlocking) waiting forever after the
+        // answer body has finished. C#'s CancellationTokenSource needs no completion; the
+        // Kotlin Job does — so the wrapper completes it on every exit path.
+        val job = Job(currentCoroutineContext()[Job])
+        try {
+            answerAsyncImpl(job, xq, style, allowCache, speechEndMs, finalizedMs, kind, turnId, replaces, heard)
+        } finally {
+            job.complete()
+        }
+    }
+
+    private suspend fun answerAsyncImpl(
+        job: Job,
+        xq: ExtractedQuestion,
+        style: AnswerStyle,
+        allowCache: Boolean,
+        speechEndMs: Long,
+        finalizedMs: Long,
+        kind: AnswerKind,
+        turnId: Int = 0,
+        replaces: AnswerView? = null,
+        heard: HeardEvidence? = null,
+    ) {
         val isVariant = kind == AnswerKind.Variant
         val question = xq.coreQuestion
         // A variant of an answer that was still streaming must still complete that question's memory (stories, metrics).
         val replacesUnfinished = isVariant && replaces != null && !replaces.isComplete
         if (replaces != null) replaces.superseded = true
-        val job = Job(currentCoroutineContext()[Job])
         if (isVariant) {
             // One variant at a time; a variant of the item that is still streaming replaces that stream.
             variantJob.getAndSet(job)?.cancel()
