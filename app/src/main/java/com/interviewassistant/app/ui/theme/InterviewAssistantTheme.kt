@@ -41,9 +41,13 @@ private val IaShapes = Shapes(
 
 @Composable
 fun InterviewAssistantTheme(content: @Composable () -> Unit) {
+    // Windows swaps to the system colours when HighContrast.IsOn (Themes/Theme.xaml DataTriggers);
+    // the Android colour set in LocalIaColors follows the same flag (P4-D DC-131).
+    val colors = if (com.interviewassistant.app.ui.components.HighContrast.isOn) IaColorSet.HighContrast else IaColorSet.Normal
     MaterialTheme(
         colorScheme = IaDarkColorScheme,
         shapes = IaShapes,
-        content = content,
-    )
+    ) {
+        androidx.compose.runtime.CompositionLocalProvider(LocalIaColors provides colors, content = content)
+    }
 }
