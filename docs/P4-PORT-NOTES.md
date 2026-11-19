@@ -1195,3 +1195,28 @@ implements HomeClipboard.setText: the same clash, inside the fake (the parent's
 round-2 sweep had dismissed this family at file level; the interface method itself
 was never the problem). The fake's recorded-content property is renamed lastText;
 the two test reads (HomeHelpTests, HomeReportsTests) updated. Assertions unchanged.
+
+### P4-C3 CI fix round 5 (DC-121)
+
+Run #222 on head 06e7033: everything compiled; 353 :app tests executed, 24 failed —
+all 24 traced to three root causes, none of them a ported-behavior error:
+(1) STACK OVERFLOW (2 relocalization tests): MainViewModel subscribed to
+Loc.languageChanged with an anonymous lambda that could never be unsubscribed, and
+VmFixture.close never disposed the VM — zombie VMs from earlier fixtures kept
+re-asserting their own uiLanguage on every language change, ping-ponging Loc
+between two values forever (verbatim CI stack: refreshLanguage:290 → Loc.set:41 →
+listener:233 → refreshLanguage…). Production has exactly one VM for the app's
+lifetime (as in C#), so this is a lifecycle defect of the port + fixture, fixed
+faithfully: the subscription is now a named handler removed in disposeAsync
+(the HomeViewModel pattern), and VmFixture.close disposes the VM.
+(2) EDITORS NEVER LOADED (20 tests across Profiles/Interviews/Navigation/
+Relocalization/DataExport): the Home fixture called refreshAll() BEFORE seeding,
+then tests added records directly to the store and navigated — but neither C# nor
+the port refreshes the editors on page entry (ShowPage is faithful; data changes
+in the app flow through actions that refresh). Fixture harness fix: addProfile /
+addTarget now refresh the corresponding editor after saving, exactly as the app's
+own actions do. No assertion changed.
+(3) BRANDING GLOBAL LEAK (supportLine_EnglishShape): P4-B's BrandingTests mutated
+the process-global Branding ("Acme Interviews") and never restored it; a later
+suite in the same JVM then read the leaked brand. BrandingTests now restores the
+defaults in tearDown via a defaults branding.json. Its assertions are unchanged.
