@@ -1,55 +1,55 @@
 package com.interviewassistant.client
 
-import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.supervisorScope
 import org.junit.Assert.assertEquals
 import org.junit.Assert.fail
 import org.junit.Test
 
 /**
- * TEMPORARY diagnostic probe (P2 CI runs #75/#79): in CloudAuthTests, an [AuthException] thrown
- * by an `async { receiver.waitForCode(...) }` child surfaced as the test failure even though the
- * test catches it around `await()`. These two minimal tests isolate whether deferred-exception
- * semantics themselves work in this test environment. Delete after diagnosis.
+ * TEMPORARY diagnostic probe, round 2 (P2 CI runs #75/#79/#80): round 1 proved that even a
+ * minimal `async { throw AuthException }` + `await()` in a try/catch(AuthException) fails in
+ * this environment — the exception escapes the catch. These variants discriminate why:
+ * catch-Throwable (class identity?) vs supervisorScope (parent job propagation?) vs a delayed
+ * throw (immediate-failure scheduling?). Delete after diagnosis.
  */
 class CoroutinesProbeTest {
 
     @Test
-    fun probeAsyncThrowCaughtByAwait() = runBlocking {
+    fun probeCatchThrowable() = runBlocking {
         val d = async { throw AuthException("browser_error", "User cancelled") }
         try {
             d.await()
             fail("expected AuthException")
-        } catch (e: AuthException) {
+        } catch (e: Throwable) {
+            assertEquals("com.interviewassistant.client.AuthException", e.javaClass.name)
             assertEquals("User cancelled", e.message)
         }
     }
 
-    private val signal = CompletableDeferred<String?>()
-
-    private suspend fun probeWait(): String {
-        val outcome = try {
-            withTimeout(20.seconds) { signal.await() }
-        } catch (e: TimeoutCancellationException) {
-            throw java.util.concurrent.TimeoutException("timeout")
+    @Test
+    fun probeSupervisorScope() = runBlocking {
+        supervisorScope {
+            val d = async { throw AuthException("browser_error", "User cancelled") }
+            try {
+                d.await()
+                fail("expected AuthException")
+            } catch (e: AuthException) {
+                assertEquals("User cancelled", e.message)
+            }
         }
-        if (outcome == "ERROR") throw AuthException("browser_error", "User cancelled")
-        return outcome ?: throw java.util.concurrent.TimeoutException("cancelled")
     }
 
     @Test
-    fun probeReceiverStyleThrowCaughtByAwait() = runBlocking {
-        val wait = async { probeWait() }
-        Thread {
-            Thread.sleep(50)
-            signal.complete("ERROR")
-        }.start()
+    fun probeDelayedThrow() = runBlocking {
+        val d = async {
+            delay(10)
+            throw AuthException("browser_error", "User cancelled")
+        }
         try {
-            wait.await()
+            d.await()
             fail("expected AuthException")
         } catch (e: AuthException) {
             assertEquals("User cancelled", e.message)
