@@ -1159,3 +1159,13 @@ stalled-stream test), DC-57 verified (timing tests 2/2). The single failure:
   instead of "", and endReason() took the exp_end_other branch instead of exp_end_active.
   The C# Str returns "" for Null (its catch-all arm). Fix: an explicit JsonNull -> ""
   arm in str(). Verified the pattern exists nowhere else in :core (single instance).
+
+## P3 CI VERIFICATION — COMPLETE (2026-11-19)
+
+GitHub Actions run #178 on head c7f10a7: **SUCCESS** (BUILD SUCCESSFUL in 2m58s, all four
+requested tasks executed fresh, none FROM-CACHE). :core **345/345 PASSED** (0 failed,
+0 skipped), :client 28/28, :contracts 11/11 — **384/384 tests green**; :app:assembleDebug
+built; shared-asset parity checksums 13/13 OK. Every divergence DC-10…DC-59 is either
+verified by this run or recorded above with its evidence. P3 (Mirror Core) is complete
+and CI-verified. Remaining honesty notes: §5.5 line-coverage targets are not wired into
+CI (unmeasured); P2's real-device/live-backend items stay scheduled for P4/P6.
