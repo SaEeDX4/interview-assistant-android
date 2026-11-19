@@ -1550,3 +1550,18 @@ early, turning the remaining comment text into code. The phrase now reads
 found one more instance, inside a // line comment in HomeLayoutTest.kt,
 which is harmless and left as-is. (The apparent mojibake near it is just
 the UTF-8 § sign shown by cat -A; the file encoding is correct.)
+
+### P4-E CI VERIFICATION — COMPLETE (2026-11-19)
+
+GitHub Actions run #258 on head 0c5d9ad — SUCCESS (2m8s):
+:app:testDebugUnitTest EXECUTED fresh and the build succeeded (Gradle
+fails the build on any test failure), so all :app tests pass; :app @Test
+total is now 461 (423 + P4-E's 38). assembleDebug built; checksums 13/13
+OK; other modules FROM-CACHE on identical inputs. Project total: 849
+tests verified green (:app 461, :core 345, :client 32, :contracts 11).
+P4-E (Home shell + Start/Profiles/Interviews/Reports + FactEditor + shell
+environment, DC-136…DC-151) is CI-verified complete. Note: the browser
+checker's report of this run embellished two details (a test-class name
+that does not exist and the playbook file names in the checksum step);
+the decisive facts (run SUCCESS, test task EXECUTED, no failures) are
+consistent with the Gradle semantics and the run's status.
