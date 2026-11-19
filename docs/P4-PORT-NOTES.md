@@ -1220,3 +1220,8 @@ own actions do. No assertion changed.
 the process-global Branding ("Acme Interviews") and never restored it; a later
 suite in the same JVM then read the leaked brand. BrandingTests now restores the
 defaults in tearDown via a defaults branding.json. Its assertions are unchanged.
+
+### P4-C3 CI fix round 6 (DC-121, continued)
+
+Run #226 on head 3f5b4ae: test compilation failed — MainViewModelFixture.kt used
+runBlocking in the new close() without importing it. Import added; nothing else.
