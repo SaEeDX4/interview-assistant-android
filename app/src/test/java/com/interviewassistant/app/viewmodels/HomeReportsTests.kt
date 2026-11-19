@@ -113,7 +113,7 @@ class HomeReportsTests {
         f.home.onReportSelectionChanged(0)
         f.home.onCopyReportClick()
         val report = ReportSerializer.fromJson(s.reportJson)!!
-        assertEquals(HtmlReportRenderer.renderText(report, Branding.productName), f.clipboard.text)
+        assertEquals(HtmlReportRenderer.renderText(report, Branding.productName), f.clipboard.lastText)
         assertTrue(f.toasts.any { it.first == Loc.t("toast_report_copied") })
     }
 

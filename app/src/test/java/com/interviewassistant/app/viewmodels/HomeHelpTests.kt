@@ -124,7 +124,7 @@ class HomeHelpTests {
     fun copyDiagnostics_CopiesTheText() {
         val f = signedInHomeFixture().also { fixture = it }
         f.home.onCopyDiagnosticsClick()
-        assertEquals(f.home.diagnosticsText(), f.clipboard.text)
+        assertEquals(f.home.diagnosticsText(), f.clipboard.lastText)
         assertTrue(f.toasts.any { it.first == Loc.t("toast_copied") })
     }
 

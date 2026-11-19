@@ -132,12 +132,12 @@ class FakeHomeFiles : HomeFiles {
 }
 
 class FakeHomeClipboard : HomeClipboard {
-    var text: String? = null
+    var lastText: String? = null
     var busy: Boolean = false
 
     override fun setText(text: String) {
         if (busy) throw ClipboardBusyException()
-        this.text = text
+        this.lastText = text
     }
 }
 
