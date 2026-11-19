@@ -1440,3 +1440,102 @@ FROM-CACHE on identical inputs. Project total: 811 tests verified green
 CI-verified complete. Compose rendering itself remains emulator-only and
 unverified by CI — the standing honesty constraint; the component rules
 with logic are pinned by the JVM suites above.
+
+## Package P4-E — Home shell + Start/Profiles/Interviews/Reports pages (Compose)
+
+Built under `app/.../ui/home/` on the CI-verified P4-C3 HomeViewModel and the P4-D component
+layer: `HomeScreen.kt` (the shell: title bar + readiness pill + account button/menu, navigation,
+page dispatch, Settings and PreInterview sticky bars, Toast/AppDialog hosts), `StartPage.kt`,
+`ProfilesPage.kt` (+ `FactEditor.kt`), `InterviewsPage.kt`, `ReportsPage.kt`, `HomeUi.kt`
+(bindable observation helpers, the "B.*" brush resolver, the §3.3 layout functions, the focus
+registry, the pure page models), and `HomeShellEnvironment.kt` (the production HomeDialogs /
+HomeFiles / HomeClipboard / HomeShell implementations). MainActivity now composes the real
+HomeScreen (the P1 skeleton is gone) with the OAuth/AppLink wiring and the composition-root
+usage unchanged. 38 new JVM tests (HomeLayoutTest 6, BrushKeyTest 4, StepCardModelTest 5,
+AccountMenuModelTest 4, WpfFilterTest 6, FactEditorFormTest 9, StagedExportsTest 4). No
+androidTest files: Compose rendering cannot run in CI (no emulator) — the standing honesty
+constraint. Deferred by name: Account page body → P4-F; Help page body → P4-F; PreInterview page
+body → P4-F (its sticky footer is built here, in the shell); Settings page body → P4-G (its
+sticky save bar is built here); the Live destination and the in-activity destination host →
+P4-G (see DC-143). The readiness footer the brief lists under the Start page is, in the
+original, the PreInterviewFooter that ShowPage shows only on the preinterview route — the
+shell builds it exactly there, bound to the VM's pf*/readinessFooter* state.
+
+- DC-136: Hosted controllers and page bodies land in their own packages. C#: HomeWindow
+  constructs SettingsPage and PreInterviewPage inline. Kotlin: HomeViewModel takes the two
+  controllers as constructor seams (P4-C3 design); P4-F builds PreInterviewPageController,
+  P4-G builds SettingsPageController. Until then MainActivity supplies factories that throw
+  IllegalStateException naming the owning package (the DC-91 pattern — no fake controller),
+  and the shell's page dispatch renders the chrome with an empty content region for the
+  account / settings / help / preinterview routes. Production HomeViewModel construction
+  therefore completes only when P4-F/G land (and remains gated by DC-91's P5/P6 providers).
+- DC-137: Window chrome and placement. C#: custom window chrome (minimize/maximize/close
+  buttons, drag, resize) and SavePlacement persists the window bounds/state into settings.
+  Android: an activity has no window chrome of its own — the title bar ends at the account
+  button, and HomeShell.placement() returns the current content size with isNormal = true,
+  isMaximized = false; the VM still writes the same settings keys, so the settings file format
+  is unchanged.
+- DC-138: Save-file staging. C#: SaveFileDialog returns a filesystem path the app then writes
+  to (File.WriteAllText / ExportFile's temp-then-rename). Android: the Storage Access
+  Framework's create-document picker returns a content Uri, which the VM's path-based writers
+  cannot use. The shell's saveFile therefore returns a staging path in the app's private
+  exports folder; a watcher copies the file to the picked destination once its size settles
+  (the writers are one-shot) and removes the staging copy. Difference: an export aborted after
+  the picker (e.g. content generation fails) can leave the empty file the picker created at
+  the destination; on Windows it leaves nothing. Pinned by StagedExportsTest.
+- DC-139: The account menu is an in-shell overlay (the C#'s AccountMenuLayer: transparent
+  full-window backdrop, card at the title bar's end, VM-owned focus index and key handling),
+  not the P4-D PopoverController — that controller's state model belongs to the Live popovers
+  (P4-G). Focus follows the VM's accountMenuFocusIndex; Escape/backdrop semantics are the VM's.
+- DC-140: Fact filter chip emphasis. C#: the active filter chip is Opacity 1.0 + SemiBold, the
+  others 0.65 + Normal (UpdateFactSummary). Kotlin: Btn.Chip's text style is fixed by the
+  component layer, so the page applies the opacity half (0.65) and marks the active chip with
+  the semantics selected state; the SemiBold half is not carried.
+- DC-141: ProfileNameSelectAll. C#: after "New empty profile" the name field is focused with
+  its text selected. Kotlin: the focus half is honored through the FocusRegistry; P4-D's
+  Input.Single exposes String state with no selection control, so the selection half is not
+  carried.
+- DC-142: Single-pane detail navigation. C#: Profiles/Interviews are always two-pane, Reports
+  always list+preview — no back affordance exists. §3.3 requires in-place detail navigation
+  below 720 dp: the detail replaces the list, and the way back is a page-title link plus the
+  system Back handler, both calling the VM's selection-changed handler with null (the same
+  call a WPF list makes when its selection clears). Nothing is invented in the VM.
+- DC-143: Leaving Home. C#: closing Home (or Start interview) shows the already-open
+  MainWindow. Android's destination host lands with the Live screen in P4-G; in P4-E the
+  activity hosts only Home, so HomeShell.close()/showLiveWindow() bind to finishing the
+  activity, and showLiveToast shows on Home's toast host (the only one that exists) — P4-G
+  rebinds all three to the in-activity destination switch and Live's own toast host.
+- DC-144: Additive glyph entries in the verified component layer. The fact rows (edit U+E70F,
+  delete U+E74D) and the Reports states (select U+E8FD, empty U+E9F9) need glyphs P4-D did not
+  ship. IaGlyph gained Edit/Delete/List/Report entries plus four vector drawables in the same
+  style; no existing entry, token or component changed.
+- DC-145: Reports in the single-scroll shell. C#: the page fills the viewport height and the
+  preview body has its own inner scroll viewer; the list opens on mouse double-click. Android:
+  the shell has one page scroll, so the preview flows in it (no nested scroller), the page is
+  content-sized (no 420 dp viewport fill), the list is capped at 160–420 dp with its own
+  scroll, and opening is via the Enter key or the Open button (double-click is not carried).
+  The list's width share is the C#'s 32*/68* star sizing with the 260 dp pane minimums,
+  expressed as HomeLayout.reportsListShare and pinned to the 0.2–0.5 band by HomeLayoutTest.
+- DC-146: MaxLength. C#: WPF MaxLength truncates input (fact text 800, role fields 120,
+  personal fields 600). P4-D's inputs have no maxLength parameter, so the pages refuse
+  over-limit edits in onValueChange — the visible result is identical (text never exceeds the
+  limit); a pasted over-limit string is refused whole rather than truncated.
+- DC-147: Deep-link route. C#: MainWindow opens Home with a route (in-app only; no external
+  URL scheme for Home exists). Android: MainActivity reads the route from the
+  EXTRA_HOME_ROUTE intent extra before the first composition and passes it as the VM's
+  initial route; onNewIntent routes navigate via navigateAsync when Home is already built.
+  The only VIEW intent filter remains the OAuth one, untouched.
+- DC-148: HighContrast source. C#: the theme follows the OS high-contrast theme. Android has
+  no direct equivalent flag; the shell observes Settings.Secure's
+  "high_text_contrast_enabled" (the platform's high-contrast-text accessibility setting) and
+  drives the P4-D HighContrast.isOn seam the theme reads.
+- DC-149: Navigation forms (§3.3). Expanded widths (≥600 dp) get the navigation rail — the
+  C# sidebar's vertical form at its 210 width, language picker under the divider; compact
+  widths get a bottom navigation bar with the language picker in a strip above it. Nav items
+  are text buttons in the C# Nav style in both forms (the original has no nav icons); the
+  active item is Surface2 + SemiBold, inactive transparent + TextDim.
+- DC-150: Cards with non-default borders/padding. IaCard's border color (B.Border) and
+  padding (18×14) are fixed; the ack card (Accent border), the step cards (state-colored
+  border), the readiness card (padding 14×10) and the sticky bars are drawn with IaCard's
+  exact drawing values (Surface background, 1 dp border, radius 12) and the border/padding
+  the XAML specifies for each.
