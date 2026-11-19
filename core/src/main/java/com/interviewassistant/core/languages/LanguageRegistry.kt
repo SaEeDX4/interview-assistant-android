@@ -70,8 +70,16 @@ object LanguageRegistry {
         return formattingLocales.getOrPut(info.code) { Locale.forLanguageTag(info.cultureName) }
     }
 
-    /** Number formatter of [formattingLocale] (what .NET `string.Format(culture, …)` applies to numbers). */
-    fun numberFormat(code: String?): NumberFormat = NumberFormat.getNumberInstance(formattingLocale(code))
+    /**
+     * Number formatter of [formattingLocale] (what .NET `string.Format(culture, …)` applies to numbers).
+     * DC-44: .NET never substitutes digits when formatting, but JVM NumberFormat does for ar/fa —
+     * the `nu-latn` Unicode extension forces Latin digits so formatted numbers match .NET output
+     * (the Windows suite pins this: fa durations render with an ASCII zero).
+     */
+    fun numberFormat(code: String?): NumberFormat {
+        val latin = Locale.Builder().setLocale(formattingLocale(code)).setExtension('u', "nu-latn").build()
+        return NumberFormat.getNumberInstance(latin)
+    }
 
     /**
      * The C# `FormattingCulture` rule: Arabic formats dates on the Gregorian calendar (billing and export
