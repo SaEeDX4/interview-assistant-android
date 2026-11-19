@@ -1,6 +1,7 @@
 package com.interviewassistant.core.persistence
 
 import com.interviewassistant.core.Fixtures
+import kotlin.time.Duration.Companion.days
 import com.interviewassistant.core.domain.CandidateProfileRecord
 import com.interviewassistant.core.domain.FactKind
 import com.interviewassistant.core.domain.FactStats
@@ -116,7 +117,7 @@ class WorkspaceStoreTests {
         assertTrue(names.contains("profile.json"))
         assertEquals(1, names.count { n -> n.startsWith("targets/") })
         assertEquals(2, names.count { n -> n.startsWith("sessions/") })
-        assertEquals(1, store.applyRetention(Duration.ofDays(90), OffsetDateTime.now(ZoneOffset.UTC)))
+        assertEquals(1, store.applyRetention(90.days, OffsetDateTime.now(ZoneOffset.UTC)))
         assertEquals(1, store.sessions().size)
         File(root).deleteRecursively()
     }

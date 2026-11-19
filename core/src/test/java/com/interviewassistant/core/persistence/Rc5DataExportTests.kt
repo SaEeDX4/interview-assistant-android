@@ -162,7 +162,7 @@ class Rc5DataExportTests {
         val p = fixtureProfile()
         p.notes = "Remember: $FakeApiKey"
         store.saveProfile(p)
-        val t = Fixtures.teroxTarget(p.id)
+        val t = Fixtures.teroxxTarget(p.id)
         t.jobTitle = "Product Owner"
         t.company = "Teroxx"
         t.roleNotes = "portal password=hunter2"
