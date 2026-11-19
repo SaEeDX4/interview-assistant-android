@@ -503,3 +503,177 @@ in this package.
 4. AppPaths/BuildInfo/Workspace reference Android classes (Context, PackageManager,
    AssetManager) behind their seams; the classes load on the JVM unit-test classpath
    (stub android.jar) and the Android paths are never invoked there.
+
+### P4-B push record (2026-11-19)
+
+Pushed in 4 commits (626e0a0 services, 670c9ce tests, cde76ee build plugin, d934399
+empty docs commit) + corrected notes re-upload be6a98a (the first docs upload used a
+stale local copy of this file — the root copy is the master; project/docs/ must be
+re-copied after every append). Head after P4-B: be6a98a (193 commits). Run #191 on
+be6a98a SUCCESS with all test tasks FROM-CACHE from the cde76ee run (docs-only delta);
+the executing run's per-test confirmation is recorded below when checked.
+
+### P4-B CI VERIFICATION (2026-11-19)
+
+GitHub Actions run #189 on head cde76ee SUCCESS (1m46s): :app:testDebugUnitTest
+EXECUTED fresh — services tests 43/43 PASSED (AppSettingsTests 17, AppLogTests 8,
+SecretStoreTests 6, BuildInfoTests 5, WorkspaceTests 5, BrandingTests 2), alongside
+the 103 P4-A UiState tests in the same task; :app:assembleDebug built; other modules
+FROM-CACHE (unchanged); checksums 13/13 OK. Runs #187/#188 on the intermediate push
+heads (626e0a0/670c9ce) failed as expected — the serialization plugin arrived only in
+the third commit (cde76ee); the complete pushed state is green. Run #191 on the final
+head be6a98a SUCCESS (docs-only delta, tests FROM-CACHE from #189).
+Run: https://github.com/SaEeDX4/interview-assistant-android/actions/runs/44548569115
+P4-B is CI-verified complete. :app test total now 146; project total 530 green.
+
+## Package P4-C1 — Observable base + CloudService facade + probe
+
+The view-model foundation and the app-level account/service facade over the P2 `:client`.
+Sources read in full before porting: `ViewModels/ObservableObject.cs`,
+`Services/CloudService.cs`, `Services/AnswerServiceProbe.cs`, audit-app.md §7 + §11.2,
+and the actual Kotlin signatures of `:client` (Auth/BackendClient/CloudOptions/
+InstallationIdentity/OAuthRedirect), `platform/Platform.kt` and the P4-B services.
+
+### Per-file checklist
+
+- `ViewModels/ObservableObject.cs` (28) → `viewmodels/ObservableObject.kt` (127):
+  `ObservableObject` + `RelayCommand` in one file, as in the C#. VMs declare one bindable
+  property per C# property (`var statusText: String by bindable("")`), see DC-84.
+- `Services/CloudService.cs` (405) → `services/CloudService.kt` (643): the facade
+  member-by-member, in C# order — `CloudState` (8 states, same order), options loading,
+  public-config cache, RefreshAsync + Classify, the auth actions, password reset,
+  re-auth (password + provider, same-user rule), sign-out, EnsureDeviceAsync, upgrade
+  poll, portal, OpenExternal. C# tuples become `Pair`/`Triple`. `Describe` delegates to
+  the P4-A `uistate/ErrorCopy`, as the C# delegates to `UiState.ErrorCopy`.
+- `Services/AnswerServiceProbe.cs` (27) → `services/AnswerServiceProbe.kt` (45):
+  same prompt ("Reply with the single word: ready"), max 5 tokens, default model
+  gpt-5.4-mini, 15 s budget, `set_key_no_reply` / ProviderException message /
+  `set_key_timeout` outcomes; the provider is closed after the probe (the C#'s `using`).
+- `viewmodels/ViewModels.kt`: the P1 placeholder object is replaced by the package doc.
+- `app/build.gradle.kts`: + `implementation(libs.okhttp)` (DC-85).
+
+### :client signature surprises (recorded for P4-C2/C3)
+
+- `BackendClient`'s Kotlin constructor is `(http, tokenProvider, baseUrl, version)` —
+  the base URL is a parameter, not the client's `BaseAddress`; `forAuth(http, auth,
+  baseUrl, clientVersion)` is the composition the facade uses.
+- `SupabaseAuth` methods take NO CancellationToken (coroutine cancellation instead) and
+  the interactive/reset flows take the `OAuthRedirectReceiver` as a parameter — the C#
+  client constructs its loopback internally (see DC-86).
+- `CloudOptions.oAuthProviders` is a `List<String>` (C#: array) — ApplyPublicConfig
+  assigns the config's list directly.
+- The P2 platform helper `sessionTokenStore(context)` names its file `session.bin`;
+  the facade's default store follows the C# file name `session.dpapi` in the roaming
+  folder, behind the same `ProtectedFileTokenStore` + `KeystoreDataProtector` (DC-85).
+
+### Divergences
+
+- **DC-84** Observable base: `INotifyPropertyChanged` becomes a StateFlow-backed
+  `bindable` delegate — assignment keeps `Set<T>`'s equality guard and named
+  notification (the name comes from the delegate's property, the `[CallerMemberName]`
+  counterpart); `raise(name)` takes the name explicitly (no CallerMemberName for plain
+  calls). `RelayCommand`: `canExecute()` evaluates the predicate live and `execute()`
+  ignores it, exactly as in the C#; WPF's `CommandManager.RequerySuggested` broadcast
+  has no Android counterpart, so requery is explicit — `raiseCanExecuteChanged()`
+  re-evaluates, updates `canExecuteFlow` (the Compose-facing snapshot) and notifies
+  `CanExecuteChanged` listeners.
+- **DC-85** CloudService construction: the C# builds its HttpClients, DPAPI token store
+  and loopback internally; the port takes them as constructor seams with the production
+  wiring as defaults (the established P4-B seam pattern). Auth client: OkHttp
+  `callTimeout(20s)` = `HttpClient.Timeout`; API client: connect 8 s, connection pool
+  10 min, no read/call timeout = the pooled handler + infinite timeout (DC-38
+  precedent). `:app` gains the catalog's OkHttp as an `implementation` dependency.
+  Token store default: `ProtectedFileTokenStore(roaming/session.dpapi,
+  KeystoreDataProtector)` — the P2 store class and protector, the C#'s file name.
+- **DC-86** Redirect + bundled-config seams: the facade creates one redirect receiver
+  per interactive/reset flow via `redirectFactory` (production: a fresh
+  `AppLinkRedirectReceiver` registered in `OAuthRedirectBus`, unregistered on close)
+  and closes it in a `finally` — the C# client creates/disposes its loopback inside
+  the flow. The shipped cloud.json reaches `loadOptions` through the
+  `bundledCloudJson` seam (default: `AppPaths.baseDirectory/cloud.json`, the
+  "next to the EXE" counterpart); the search order, parse-failure-continues and
+  catch-and-warn behaviour are the C#'s. `loadOptions(developer)` is internal so the
+  developer-override ordering is testable (BuildFlavor.Developer is a const `false`
+  in customer builds).
+- **DC-87** Cancellation: `RefreshAsync`'s caller-token branch (restore the pre-refresh
+  state when the state is Connecting, return false) becomes: restore identically, then
+  rethrow `CancellationException` — a cancelled coroutine must stay cancelled. A
+  caller-imposed `withTimeout` (the health-check pattern) therefore takes the restore
+  branch, not the C#'s ServiceUnavailable arm; the client layer already converts its
+  own timeouts (`AuthException("network")`, `BackendException(504)`), so the
+  difference is confined to caller deadlines, where restoring is the C#'s own choice
+  for its token. The probe's 15 s token source is `withTimeout`, whose
+  `TimeoutCancellationException` maps to `set_key_timeout`.
+- **DC-88** Upgrade poll: the 15-minute `CancellationTokenSource` becomes an internal
+  supervisor-scope Job (cancelled by sign-out / a newer upgrade, as the C# cancels the
+  source) plus a deadline check on the injectable `nowMillis` clock and the injectable
+  `upgradeDelay`; loop shape (delay 5 s → refresh → paid check) and the `finally`
+  (UpgradePending = false + Changed) are unchanged.
+- **DC-89** OpenExternal + device identity: the C#'s one-step validate-and-launch
+  splits into the pure gate `isOpenableExternalUrl` (absolute https + DNS host name;
+  IPv4/IPv6 literals and bare numbers refused, matching `UriHostNameType.Dns`) and the
+  composition-installed `urlLauncher` (Android cannot launch a browser without a
+  Context; uninstalled ⇒ refuse). The launcher receives the caller's validated string
+  (the C# passes the canonicalized `AbsoluteUri`). `Environment.MachineName` becomes
+  manufacturer+model (`android.os.Build`) behind `deviceNameProvider`; the 1..60-char
+  rule is unchanged, the fallback name is "Android device" (C#: "Windows PC"), and
+  `RegisterDeviceRequest.platform` is "android" (C#: "windows-x64").
+
+### Test mapping (52 new @Test)
+
+- `app/viewmodels/ObservableObjectTests.kt` — 8: Set equality guard + named raise,
+  Raise unconditional, flow reflection, listener removal; RelayCommand live
+  evaluation, unconditional Execute, raiseCanExecuteChanged flow + notification.
+  (The C# has no dedicated tests for these 28 lines; expectations are the source's
+  contract, asserted directly.)
+- `app/services/CloudServiceTests.kt` — 36, against fake OkHttp transports for both
+  hosts (the P2 interceptor pattern): options (not-configured, bad JSON, client
+  version, developer override + bad-override fall-through, forced URL); refresh
+  classification (signed-out sign-in message + config applied + cache written +
+  cache applied at next construction, auth-unavailable message, plans-once, 426,
+  account_disabled, 500 with short reference, offline, signed-in happy path with
+  device registration asserted as platform "android" + device id saved, long device
+  name fallback, 401-after-refresh → SessionExpired, invalid_grant → local sign-out
+  → SignedOut, auth 500 during refresh → ServiceUnavailable with the session kept);
+  sign-in (config-first, wrong password), sign-up (confirmation required vs
+  immediate), provider sign-in (receiver closed), reset (refused for another
+  account with zero HTTP calls; happy path sets the password and refreshes),
+  re-auth (same user / different user signs out / wrong password / signed out),
+  SignInProvider JWT table, sign-out clearing, upgrade poll (paid reached, 15-min
+  timeout with real polling, non-https checkout refused), portal, IsPaidState table,
+  OpenExternal gate table.
+- `app/services/AnswerServiceProbeTests.kt` — 4: first delta Ok with the exact
+  prompt + default model asserted on the wire, explicit model, empty stream →
+  `set_key_no_reply`, 401 → the ProviderException's message verbatim. The 15 s
+  timeout arm is not run (it needs a real 15 s stall); it is the same withTimeout
+  the provider tests exercise at shorter budgets.
+- `client/BackendExceptionTests.kt` — 4 (see the accounting below).
+
+### ErrorStateTests.cs — BackendException half: accounting
+
+ErrorStateTests asserts about `Client.BackendException` only by constructing it —
+(0, "network"), (504, "timeout", correlation id), (500, "") — and asserting through
+`ErrorCopy.Describe`. Those assertions were already ported in P4-A
+(`app/uistate/ErrorStateTests.kt`, all three Describe facts + IsUserCancellation);
+nothing was missing there, and no duplicate was added. The P2 `:client` suite had
+ZERO BackendException coverage, so the genuinely missing piece is the exception's own
+contract that the app layer branches on (Classify's `IsUpdateRequired`, ErrorCopy's
+status/code branches): `client/BackendExceptionTests.kt` pins the stored fields with
+ErrorStateTests' exact constructions, `IsUpdateRequired` (426 only) and
+`IsEntitlement` (402 or device_limit/concurrent_limit/allowance_exhausted) with the
+derivation table from `BackendClient.cs`, and the settable `Source` diagnostic.
+
+### Compile risks (self-identified, for CI)
+
+1. CloudService's seam defaults call private companion functions
+   (`defaultAuthHttp`, `createPlatformReceiver`, `readTextOrNull`) from default
+   parameter expressions — standard Kotlin, first exercised by CI.
+2. `val options/auth/api` are assigned in the `init` block (definite assignment
+   across the configured/not-configured branches).
+3. `loadOptions` is `internal` and read from the unit tests (friend module, the
+   P4-B precedent).
+4. The probe's internal 3-arg `runAsync` overload is called from the `:app` unit
+   tests (friend module); the public 2-arg form delegates to it.
+5. `AppLinkRedirectReceiver.create`'s factory lambda shape
+   (`(String) -> String`) is taken from Platform.kt as written; if its signature
+   differs at compile time this is the first place it shows.
