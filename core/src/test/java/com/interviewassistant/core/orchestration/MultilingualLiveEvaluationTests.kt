@@ -3,7 +3,7 @@ package com.interviewassistant.core.orchestration
 import com.interviewassistant.core.Fixtures
 import com.interviewassistant.core.intelligence.AnswerStyle
 import com.interviewassistant.core.intelligence.FactValidator
-import com.interviewassistant.core.intelligence.LanguageDetector
+import com.interviewassistant.core.languages.LanguageDetector
 import com.interviewassistant.core.knowledge.AnswerMode
 import com.interviewassistant.core.live.Presentation
 import com.interviewassistant.core.providers.ChatProviderOptions

@@ -3,7 +3,7 @@ package com.interviewassistant.core.orchestration
 import com.interviewassistant.core.Fixtures
 import com.interviewassistant.core.audio.AudioFixtures
 import com.interviewassistant.core.audio.RecordedStyleAudioTests
-import com.interviewassistant.core.intelligence.DuplicateGuard
+import com.interviewassistant.core.turn.DuplicateGuard
 import com.interviewassistant.core.intelligence.FollowUpIntent
 import com.interviewassistant.core.intelligence.FollowUpKind
 import com.interviewassistant.core.intelligence.PromptEchoDetector

@@ -248,8 +248,8 @@ class LiveIntelligenceTests {
         assertNotNull(t.interviewerSpeechStarted(31_000)) // fast follow
         assertEquals(AdaptiveLevel.Concise, t.level)
         for (i in 0 until 3) {
-            t.answerShown(100_000 + i * 60_000, 40, 3 + i)
-            t.interviewerSpeechStarted(100_000 + i * 60_000 + 40_000)
+            t.answerShown(100_000 + i * 60_000L, 40, 3 + i)
+            t.interviewerSpeechStarted(100_000 + i * 60_000L + 40_000)
         }
         assertEquals(AdaptiveLevel.Normal, t.level)
     }

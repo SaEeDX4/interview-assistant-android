@@ -673,7 +673,12 @@ class Rc2EngineTimingTests {
         assertEquals(0, s.e.turn.currentText().length)
     }
 
-    /** JVM analog of GC.CollectionCount(2): total GC collections across all collectors. */
-    private fun usedHeapMark(): Long =
-        java.lang.management.ManagementFactory.getGarbageCollectorMXBeans().sumOf { b -> b.collectionCount }
+    /** JVM analog of GC.CollectionCount(2): total GC collections across all collectors.
+     *  java.lang.management is not on the Android unit-test compile classpath, so it is
+     *  reached reflectively (it exists on the host JVM that runs the tests). */
+    private fun usedHeapMark(): Long {
+        val beans = Class.forName("java.lang.management.ManagementFactory")
+            .getMethod("getGarbageCollectorMXBeans").invoke(null) as List<*>
+        return beans.sumOf { b -> b!!.javaClass.getMethod("getCollectionCount").invoke(b) as Long }
+    }
 }
