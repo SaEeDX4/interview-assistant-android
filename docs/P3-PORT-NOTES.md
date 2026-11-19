@@ -1144,3 +1144,18 @@ minutes. The 10-minute cap dated from the P2-era 39-test suite; the 345-test P3 
 legitimately needs more (run #161 executed 289 tests in ~10 minutes with everything
 working). This is a CI budget, not a test change — every test keeps its own internal
 time bounds exactly as ported.
+
+## CI fix round 10 (2026-11-19, after Actions run #176 on 0127fb2) — DC-59
+
+Run #176 was the first complete full-suite execution: **345 tests completed, 344 passed,
+1 failed, 0 skipped** in 2m22s — DC-58 verified (ProviderTests 12/12 including the
+stalled-stream test), DC-57 verified (timing tests 2/2). The single failure:
+
+- **DC-59 — JSON null must read as "" in the account renderer's Str helper.**
+  Rc5DataExportReportTests.accountHtml_IsHuman_Escaped_AndHasNoSecrets failed on
+  `html.contains("Still running")`. Root cause: AccountExportRenderer.str() mapped any
+  non-string JsonPrimitive via toString(); kotlinx's JsonNull IS a JsonPrimitive whose
+  toString() is "null", so a running session's null endReason read as the string "null"
+  instead of "", and endReason() took the exp_end_other branch instead of exp_end_active.
+  The C# Str returns "" for Null (its catch-all arm). Fix: an explicit JsonNull -> ""
+  arm in str(). Verified the pattern exists nowhere else in :core (single instance).
