@@ -214,7 +214,7 @@ class DialogControllerTest {
     }
 
     @Test
-    fun initialFocus_IsTheDefaultAction_UnlessAnActionIsNamed() = runBlocking {
+    fun initialFocus_IsTheDefaultAction_UnlessAnActionIsNamed() { runBlocking {
         val c = DialogController()
         val named = DialogAction(text = "Field-side", result = AppDialogResult.Secondary)
         val def = DialogAction(text = "OK", isDefault = true)
@@ -236,5 +236,5 @@ class DialogControllerTest {
         val pending3 = async { c3.show(req3) }
         assertEquals(-1, c3.initialFocusIndex(awaitTop(c3)))
         c3.closeOwner(); pending3.await()
-    }
+    } }
 }

@@ -82,7 +82,7 @@ class Rc5ComponentAccessibilityTests {
     }
 
     @Test
-    fun dialogs_InitialFocusIsTheSafeDefault() = runBlocking {
+    fun dialogs_InitialFocusIsTheSafeDefault() { runBlocking {
         // non-destructive confirm: focus starts on the confirm action (index 1)
         val c1 = DialogController()
         val a1 = async { AppDialog.confirm(c1, "Proceed?", "Go") }
@@ -95,7 +95,7 @@ class Rc5ComponentAccessibilityTests {
         repeat(100) { if (c2.topLayer != null) return@repeat; delay(10) }
         assertEquals(0, c2.initialFocusIndex(c2.topLayer!!))
         c2.closeOwner(); a2.await()
-    }
+    } }
 
     @Test
     fun levelMeter_TheScreenReaderValueStaysAReadOnlyPercent() {
