@@ -16,9 +16,11 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
@@ -134,10 +136,12 @@ class CloudAuthTests {
 
         /**
          * Waits for the accept thread's terminal outcome. The outcome travels as a VALUE and the
-         * [AuthException] is created and thrown here, in the waiter — never stored in a deferred
-         * (CI run #75: an AuthException stored via `completeExceptionally` surfaced as the failure
-         * of loopbackRejectsMalformedAndOversizedRequestsAndKeepsWaiting despite the test's catch
-         * around `await()`; the value-carrying code path in the same run passed).
+         * [AuthException] is created and thrown here, in the waiter — never stored in a deferred.
+         * (The loopback tests' long failure trail — CI runs #75/#79/#80 — was finally traced by a
+         * temporary probe in run #81 to the tests' `async` parenting, not to this receiver: a
+         * failed plain `async` child of runBlocking cancels the parent job and is rethrown by
+         * runBlocking itself, past any catch around `await()`; the waits are therefore parented
+         * to a SupervisorJob, matching the C# Task semantics the port assumes.)
          */
         override suspend fun waitForCode(timeout: Duration): String {
             val outcome = try {
@@ -375,7 +379,12 @@ class CloudAuthTests {
         val loop = TestLoopbackReceiver()
         try {
             assertTrue(loop.redirectUri.startsWith("http://127.0.0.1:"))
-            val wait = async { loop.waitForCode(20.seconds) }
+            // The C#'s wait handle is a Task: a faulted Task never cancels its surroundings —
+            // the fault is observed by awaiting it. A plain `async` child of runBlocking does
+            // not behave that way here (proven by a temporary probe, CI runs #80/#81): its
+            // failure cancels the parent job and runBlocking rethrows it past the catch around
+            // await(). Parenting the wait to a SupervisorJob restores the Task semantics.
+            val wait = async(SupervisorJob(coroutineContext.job)) { loop.waitForCode(20.seconds) }
             val (wrongCode, _) = httpGet("http://127.0.0.1:${loop.port}/callback?s=forged&code=EVIL")
             assertEquals(404, wrongCode)
             assertFalse(wait.isCompleted)
@@ -392,7 +401,12 @@ class CloudAuthTests {
     fun loopbackRejectsMalformedAndOversizedRequestsAndKeepsWaiting() = runBlocking {
         val loop = TestLoopbackReceiver()
         try {
-            val wait = async { loop.waitForCode(20.seconds) }
+            // The C#'s wait handle is a Task: a faulted Task never cancels its surroundings —
+            // the fault is observed by awaiting it. A plain `async` child of runBlocking does
+            // not behave that way here (proven by a temporary probe, CI runs #80/#81): its
+            // failure cancels the parent job and runBlocking rethrows it past the catch around
+            // await(). Parenting the wait to a SupervisorJob restores the Task semantics.
+            val wait = async(SupervisorJob(coroutineContext.job)) { loop.waitForCode(20.seconds) }
             Socket().use { tcp ->
                 tcp.connect(InetSocketAddress(InetAddress.getByName("127.0.0.1"), loop.port))
                 val s = tcp.getOutputStream()
