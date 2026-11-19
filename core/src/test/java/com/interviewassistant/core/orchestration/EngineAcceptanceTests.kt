@@ -228,9 +228,7 @@ class EngineAcceptanceTests {
     fun i_AiFailureUsesSafePreparedAnswerOrActionableMessage() = runBlocking {
         val s = sim(EngineOptions().apply { autoTick = false; useFastCache = false; developerKeyMode = false })
         s.p.throwEx = ProviderException(ProviderErrorKind.ServiceUnavailable, "503").apply { code = "ai_unavailable" }
-        println("PROBE: sim ready")
         s.e.submitManualQuestion("How would you increase XAB adoption?") // prepared answer exists
-        println("PROBE: first submit returned")
         val known = s.e.current!!
         assertEquals(AnswerSource.CacheFallback, known.source)
         assertEquals(3, known.snapshotBullets().size)
@@ -238,7 +236,6 @@ class EngineAcceptanceTests {
         assertFalse(known.note!!.contains("Unknown"))
 
         s.e.submitManualQuestion("How would you design a quantum-safe custody roadmap for 2030?") // nothing prepared
-        println("PROBE: second submit returned")
         val novel = s.e.current!!
         assertEquals(AnswerSource.Error, novel.source)
         assertEquals(ProviderErrorKind.ServiceUnavailable, novel.error)
