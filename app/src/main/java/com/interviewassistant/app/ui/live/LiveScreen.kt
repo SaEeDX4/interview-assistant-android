@@ -134,13 +134,12 @@ import kotlinx.coroutines.launch
  * card (bullets / Coach / profile-gap), the action and manual bars, Quick help and the More menu,
  * toasts and in-app dialogs through its own hosts.
  *
- * Static states only in this package: the capture service behind the meter and the session is the
- * P5 platform service (its composition factory keeps throwing until then, DC-91), so every state
- * rendered here is one the view model can already be in. Window behaviour maps through the D8
- * substitutes (DC-162): no minimize/maximize/close buttons (the activity owns them, DC-137), the
- * saved window opacity applies as the root's alpha, Topmost stays the persisted switch the
- * readiness check reads (DC-153), and Interview Focus placement waits for the floating window
- * (DC-161) — its dialog, presets and persistence are here.
+ * The capture service behind the meter and the session is the P5 platform service
+ * (`platform/audio/AudioCaptureService`). Window behaviour maps through the D8 substitutes
+ * (DC-162): no minimize/maximize/close buttons (the activity owns them, DC-137), the saved
+ * window opacity applies as the root's alpha, Topmost stays the persisted switch the readiness
+ * check reads (DC-153), and Interview Focus placement is the platform's PiP act behind the
+ * FocusPlatform seam (DC-161, resolved in P5) — its dialog, presets and persistence are here.
  */
 @Composable
 fun LiveScreen(
@@ -281,16 +280,18 @@ private fun LiveContent(
     val hasFocusRestore = (vm.settings.focusRestoreWidth ?: 0.0) > 0 && (vm.settings.focusRestoreHeight ?: 0.0) > 0
 
     fun restoreFocusPlacement() {
-        // The placement record only exists once the platform placer (the floating Live window,
-        // D8/P6) has applied Interview Focus; restoring it is that placer's work (DC-161).
+        // Restoring is the platform placer's act (P5: leaving PiP, D9) behind the FocusPlatform
+        // seam; the record it reads is the one applying Focus wrote (DC-161, resolved in P5).
         if (!hasFocusRestore) return
+        com.interviewassistant.app.platform.FocusPlatform.restoreFocus()
     }
 
     fun applyFocus(preset: FocusPreset) {
-        // The chosen preset is remembered exactly like the C#'s; the geometry applies to the
-        // floating window when the platform layer lands (DC-161).
+        // The chosen preset is remembered exactly like the C#'s; the platform act (P5: entering
+        // PiP while a session is active, D9) runs behind the FocusPlatform seam (DC-161).
         vm.settings.interviewFocusPreset = preset.name
         vm.settings.save()
+        com.interviewassistant.app.platform.FocusPlatform.applyFocus(preset)
     }
 
     fun showFocusDialog() {
@@ -1329,6 +1330,17 @@ private fun LiveManualBar(vm: MainViewModel) {
     val scope = rememberCoroutineScope()
     var text by remember { mutableStateOf("") }
 
+    // The D2 ManualInput shortcut lands here: while the bar is composed it registers the focus
+    // action the platform's LiveFocusRequests dispatches to (P5).
+    val manualRequester = remember { FocusRequester() }
+    DisposableEffect(manualRequester) {
+        val listener: () -> Unit = { runCatching { manualRequester.requestFocus() } }
+        com.interviewassistant.app.platform.LiveFocusRequests.manualInputListeners += listener
+        onDispose {
+            com.interviewassistant.app.platform.LiveFocusRequests.manualInputListeners -= listener
+        }
+    }
+
     fun submit() {
         val value = text
         text = ""
@@ -1351,6 +1363,7 @@ private fun LiveManualBar(vm: MainViewModel) {
                 modifier = Modifier
                     .weight(1f)
                     .height(IaTokens.ControlHeight)
+                    .focusRequester(manualRequester)
                     .onPreviewKeyEvent { event ->
                         if (event.type == KeyEventType.KeyDown && event.key == Key.Enter) {
                             submit()
