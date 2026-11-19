@@ -1282,3 +1282,128 @@ in each case the ported production code was verified faithful to the C#
 before any fix was made; no expected value was ever changed to fit the port.
 (Two "Failed to save cache entry" warnings in the run's post-step are cache
 contention noise, not failures.)
+
+## Package P4-D — Theme + components + hosts (Compose component layer)
+
+Scope: TRANSFER-MAP §3.1 tokens verified, every §3.1 control style as a composable, the Toast/Dialog/Popover
+hosts (§3.2 rows 19–21), ExportChoiceList (row 18) and the QuickHelp popover content. Pages that consume
+these land in P4-E/F/G. All Windows sources were read in full: Themes/Theme.xaml (750 lines), Views/
+ToastHost.cs, AppDialog.cs, Dialogs.cs, DeleteAccountDialog.cs, ExportDialog.cs, ExportChoiceList.xaml(.cs),
+Popover.cs, InfoTip.cs, InlineMessage.cs, FormField.cs, RovingRadios.cs, Accessible.cs, FormAssist.cs
+(HighContrast), UiState/QuickHelp.cs (already ported in P4-A) and MainWindow.QuickHelp.cs.
+
+### Theme verification (§3.1)
+
+Tokens.kt (P1) checked value-by-value against §3.1 / audit-app §1: all 20 colours, radii and the sizes it
+carried were already exact — no drift found. Added what P1 had not transcribed: SplitMaxWidth 940,
+ShortFieldWidth 320, SidePaneWidth 240, PaneGap 20, PaneMinWidth 260, ColumnGap 12, every §3.1 padding
+(input 10×6, multiline 10×8, button 14×6, base 12×6, ghost 8×6, link 6×2, chip 11×5, form 16×6, list item
+10×7, card 18×14, choice card 12×10, seg track 3, seg item 12×4), the margins (page 8/0/16/8, section
+0/24/0/8, field label 0/12/0/6, hint 4, button row 14, stack 8, divider 0/8/0/16, field gap 4), the focus
+ring (2 dp; outset 2 button / 3 input) and the shadow tokens (blur 24, depth 4, opacity 0.35).
+New: theme/Typography.kt (IaTextStyles — the T.* styles as functions of the active colour set) and
+theme/Colors.kt (IaColorSet + LocalIaColors); InterviewAssistantTheme now provides the colour set and
+follows HighContrast.isOn. NO pill/capsule shapes anywhere: buttons, segments and chips all use radius 8.
+
+### Components (ui/components/, one file per family, C# names kept)
+
+Btn (Base/Primary/Danger/Ghost/Link/Chip/Form/FormPrimary/FormDanger + Content) with the XAML template's
+white state overlay (hover 0.07 / pressed 0.14), disabled opacity 0.4 and the 2 dp-outset focus ring;
+Input (Single/Multiline/Bare) + PasswordInput with the family states (hover TextDim border, focus Accent +
+AccentSoft ring at radius 11 outset 3, error Error + ErrorSoft ring, read-only Surface fill, disabled 0.5)
+and the Watermark placeholder rule (empty AND unfocused, text inset 2); IaCheck; IaCombo (chevron-only
+toggle, popup items 13, item padding 10×7); Seg.Track/Item (AccentStrong fill when checked); IaListItemRow;
+IaCard/IaDivider/IaEmptyStateIcon; IaFormField + IaInfoTip (+ IaToolTipCard); IaInlineMessage; IaLevelMeter
+(progress-bar semantics, Accessible.cs); the slim scrollbar (Scrollbar.kt); IaGlyph — 19 vector drawables,
+one per Segoe Fluent code point of §3.1 (play E768 … chevron E70D, info E946, error EA39 — the last two read
+from the C# sources, they are not in the map's list).
+
+### Hosts
+
+- Toast: ToastController (pure) + ToastHost composable. Max 3 (oldest removed at once), same text within
+  4 s shown once, durations Error 7000 / Warning 5500 / with-detail 4500 / plain 3200 (explicit ms wins),
+  fade-out 160 ms, entrance fade 180 / slide 220 ease-out, click dismisses, Escape dismisses the newest,
+  announcement = text + ". " + detail, Error assertive. showConnection() words the pair exactly as
+  MainViewModel.ShowConnectionToast (the gate itself is the P4-A ConnectionToastGate; MainViewModel already
+  feeds the VMs' notifyListeners — the shell binds those to this controller in P4-E/G).
+- Dialog: DialogController (pure stack) + AppDialog builders (alert/confirm/askUnsaved with the exact
+  action construction) + AppDialogHost composable + IaDialogs (newPassword, currentPassword, deleteAccount
+  step 1 + body, askDeleteLocalData, chooseExportFormat, confirmImport preview) with the form states in
+  Dialogs.kt (NewPasswordForm: <8 → err_password_short, mismatch → err_password_mismatch;
+  CurrentPasswordForm: empty → err_password_empty, verifier error shown + box cleared;
+  DeleteAccountLogic: the Choice mapping and both action sets; ExportDialogLogic: choices + Describe).
+  Escape = cancel action (single action: itself), never validated, blocked while busy; Enter follows
+  OnKeyAsync (multiline/open-combo keep it, a focused button runs itself, else the default action);
+  owner-close completes everything with Cancel and late shows answer Cancel at once.
+- Popover: PopoverController (pure closing rules) + IaPopover host with the C#'s two placements
+  (end-aligned +8/+2, fallback start-aligned). QuickHelpContentView renders the P4-A QuickHelp content as
+  BuildQuickHelp lays it out (headings, lines, shortcut rows LTR with "label: keys" names, action link,
+  qh_full_help link).
+- ExportChoiceList: ExportChoiceState (preselection = named key else first; arrows via RovingSelection,
+  RTL-mirrored) + the card composable (Surface2/AccentSoft, 18 dp ring + 8 dp dot, whole card the target,
+  group name = the question, option name = title, help = description).
+
+### Tests (JVM, app/src/test/java/com/interviewassistant/app/ui/) — 70 @Test in 7 files
+
+ThemeTokensTest 10 (§3.1 values verbatim, colour sets, text styles, glyph code points, no-pill radii),
+ToastControllerTest 13, DialogControllerTest 13, DialogFormsTest 15, PopoverControllerTest 7,
+ComponentLogicTest 7 (roving, scrollbar geometry, level-meter value, inline announcement),
+Rc5ComponentAccessibilityTests 5 — the component-layer counterparts of Rc5AccessibilityTests.cs (P4-A
+deferral), with the per-test mapping in that file's header. NOT run here: CI is the first execution check.
+Compose rendering (androidTest) tests are NOT written: no emulator exists in CI, so semantics-tree
+assertions would be unverifiable claims; the JVM tests pin every rule that has logic.
+
+### Divergences
+
+- DC-124 (model placement): DialogTone, MessageKind, DeleteAccountChoice and ExportChoice/ExportFormats
+  already live in viewmodels/HomeRows.kt (P4-C3, mirroring the same C# types). P4-D reuses them instead of
+  declaring second copies in ui.components; AppDialogResult/DialogButtonRole (new in P4-D) live in
+  ui.components as the C#'s Views placement prescribes.
+- DC-125 (scrollbar): C# styles the real WPF ScrollBar (6 wide, Surface3 thumb, radius 3). Compose has no
+  equivalent styled scrollbar for a plain Column; the Android scrollbar is a drawWithContent overlay driven
+  by ScrollState and the pure ScrollbarGeometry (thumb = visible fraction, travels the free track, hidden
+  when everything fits). Same visual contract; pages wire it where the XAML shows a bar.
+- DC-126 (Check geometry): the XAML Check style sets only font (13), foreground and margin (0,4) — the box
+  itself is the WPF OS-default template, which has no token to transcribe. Android draws an 18 dp box
+  (radius 4, matching the app's other 18 dp marks), AccentStrong fill + white check when checked.
+- DC-127 (dialog Enter rule): the controller implements OnKeyAsync exactly; the host learns "what is
+  focused" through a DialogFocusTracker (buttons report themselves; bodies report multiline/combo focus
+  via LocalDialogFocusTracker). WPF reads Keyboard.FocusedElement directly. Same decisions, indirect signal.
+- DC-128 (popover shell signals): WPF Popover subscribes to window Deactivated/LocationChanged/SizeChanged/
+  StateChanged itself. An Android Popup has no such window events; PopoverController carries the exact
+  rules and the shell (P4-E/G) forwards activity lifecycle/geometry events to it. Outside-tap and Escape are
+  wired by IaPopover itself.
+- DC-129 (FormField label link): WPF sets AutomationProperties.LabeledBy from the field's label to the
+  input inside. Compose has no LabeledBy; the contract is that callers pass the same label as the input's
+  contentDescription (IaFormField documents it; IaDialogs' fields do it). The label still renders in the
+  label row with the InfoTip named "More information: <label>".
+- DC-130 (shadow): E.Shadow (blur 24, depth 4, direction 270°, 0.35 black) has no Compose equivalent;
+  elevated surfaces (cards in dialogs, popovers, toasts) use an 8 dp elevation shadow of the same visual
+  weight. §3.1 already classes the shadow as a cosmetic approximation.
+- DC-131 (high contrast): Windows swaps brushes to SystemColors (window/control/highlight). Android has no
+  single system palette; IaColorSet.HighContrast approximates it (black surfaces, white text/borders,
+  yellow highlight accent, system-blue strong accent) behind the same HighContrast.IsOn switch, which the
+  platform layer sets from the device's high-contrast accessibility state.
+- DC-132 (InfoTip tip): WPF shows a ToolTip (hover after 250 ms, focus, click; 60 s duration). Touch has no
+  hover; IaInfoTip opens the same Surface3 card as a Popup on focus and on click, closing on click-again,
+  Escape, focus loss or outside tap. Text, name and help-text rules are the C#'s.
+- DC-133 (Combo popup): the WPF drop-down (Surface2 card, padding 4, items with the ComboBoxItem template)
+  is rendered with Compose DropdownMenu restyled to the same values (items 13 sp, padding 10×7, radius 6,
+  highlighted Surface3 — hover state, selected AccentSoft, max height/scroll are the platform menu's).
+- DC-134 (dialog window): DialogHost is an in-window overlay grid in WPF; the Android host renders the top
+  layer in a Compose Dialog (its own window) with dismissOnClickOutside=false and back = Escape semantics.
+  Backdrop, card, stacking (top owns the keys) and results are identical; focus restoration on close is the
+  platform's (focus returns to the activity's previously focused element) instead of the C#'s explicit
+  PreviousFocus bookkeeping.
+
+### Deferred by name
+
+- FactEditor dialog (Views/Dialogs.cs) and the HomeDialogs.editFact implementation → P4-E (Profiles page).
+- Interview Focus first-use dialog (radio presets) → P4-G (Live); its RovingSelection mechanism is here.
+- Home step-card accessibility (Rc5 StyledFocusableBorders) → P4-E; page level meters → P4-F/G; Live
+  readiness icon + More-menu toggle rows → P4-G (see Rc5ComponentAccessibilityTests header).
+- Wiring: MainViewModel/HomeViewModel notifyListeners → ToastController, HomeDialogs → IaDialogs/AppDialog,
+  HighContrast.isOn ← platform accessibility state → P4-E (shell) — the seams and hosts are complete here.
+- Rc5DesignSystemTests.cs: the XAML-scan rules (inputs inside FormField, token-only sizes) have no Android
+  source to scan; their substance is the component defaults asserted in ThemeTokensTest. Page-level
+  adherence is reviewed per page in P4-E/F/G.
