@@ -20,11 +20,11 @@ import com.interviewassistant.app.ui.home.ShellHomeClipboard
 import com.interviewassistant.app.ui.home.ShellHomeDialogs
 import com.interviewassistant.app.ui.home.ShellHomeFiles
 import com.interviewassistant.app.ui.home.ShellHomeShell
+import com.interviewassistant.app.ui.preinterview.PreInterviewPageControllerImpl
 import com.interviewassistant.app.ui.theme.InterviewAssistantTheme
 import com.interviewassistant.app.uistate.HomeRoute
 import com.interviewassistant.app.viewmodels.HomeViewModel
 import com.interviewassistant.app.viewmodels.MainViewModel
-import com.interviewassistant.app.viewmodels.PreInterviewPageController
 import com.interviewassistant.app.viewmodels.SettingsPageController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -44,8 +44,11 @@ import kotlinx.coroutines.launch
  * P4-E: the activity hosts the real Home shell ([HomeScreen]). It builds the Home view model with
  * the shell environment (dialog host, toast host, file pickers, clipboard, window shell) the same
  * way the C#'s HomeWindow is constructed by its owner, and resolves the initial route from the
- * launching intent before the first composition (DC-147). Two construction inputs still land in
- * later packages — the hosted Settings (P4-G) and PreInterview (P4-F) page controllers — and the
+ * launching intent before the first composition (DC-147).
+ *
+ * P4-F: the pre-interview page controller is real now — one instance serves both the Home view
+ * model (through the seam) and the page composable (through [HomeScreen]). One construction input
+ * still lands in a later package — the hosted Settings page controller (P4-G) — and the
  * composition's capture/update providers land in P5/P6; until then the lazy construction fails
  * with their explicit IllegalStateException instead of any fake behavior (DC-91, DC-136).
  */
@@ -88,7 +91,7 @@ class MainActivity : ComponentActivity() {
         fileBridge.launchSave = { fileName, mimeType -> launchSave(fileName, mimeType) }
         setContent {
             InterviewAssistantTheme {
-                HomeScreen(homeViewModel, homeDialogs, homeToasts, focusRegistry)
+                HomeScreen(homeViewModel, homeDialogs, homeToasts, focusRegistry, preInterviewController)
             }
         }
     }
@@ -120,6 +123,20 @@ class MainActivity : ComponentActivity() {
         createDocument.launch(intent)
     }
 
+    /**
+     * The pre-interview page controller (P4-F): built once from the composition's main view model,
+     * handed to the Home view model through its seam and to the shell for the page composable. Its
+     * probes run on the Home scope; its store renders marshal to the main thread, like the C#
+     * page's Dispatcher marshaling.
+     */
+    val preInterviewController: PreInterviewPageControllerImpl by lazy {
+        PreInterviewPageControllerImpl(
+            vm = composition.mainViewModel,
+            scope = homeScope,
+            postToUi = { action -> mainHandler.post { action() } },
+        )
+    }
+
     private fun buildHomeViewModel(): HomeViewModel {
         val home = HomeViewModel(
             vm = composition.mainViewModel,
@@ -138,7 +155,7 @@ class MainActivity : ComponentActivity() {
                 onShowLive = { finish() },
             ),
             settingsPage = unavailableSettingsController(),
-            preInterview = unavailablePreInterviewController(),
+            preInterview = preInterviewController,
             initial = HomeRoute.parse(intent?.getStringExtra(EXTRA_HOME_ROUTE)),
             osVersion = { Build.VERSION.RELEASE ?: "" },
         )
@@ -157,10 +174,6 @@ class MainActivity : ComponentActivity() {
     /** DC-136: the Settings page controller is built by P4-G; until then its absence is explicit. */
     private fun unavailableSettingsController(): SettingsPageController =
         throw IllegalStateException("The Settings page controller lands in P4-G (P4-PORT-NOTES DC-136).")
-
-    /** DC-136: the pre-interview page controller is built by P4-F; until then its absence is explicit. */
-    private fun unavailablePreInterviewController(): PreInterviewPageController =
-        throw IllegalStateException("The Pre-interview page controller lands in P4-F (P4-PORT-NOTES DC-136).")
 
     companion object {
         /** Intent extra carrying a Home route ("settings/audio") for the shell to open (DC-147). */
