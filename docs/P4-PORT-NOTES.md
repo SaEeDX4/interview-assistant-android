@@ -1156,3 +1156,16 @@ in CI — JVM parity tests only, as for P4-A/B/C1/C2).
 - DC-119: FileStamp reads the `today` clock seam (LocalDate) instead of
   DateTime.Now, for deterministic tests; the production default is
   LocalDate.now() in the device zone, as in the C#.
+
+### P4-C3 CI fix round 1 (DC-120)
+
+Run #214 on head 857b165 failed at :app:compileDebugKotlin — four call-site defects
+in the new C3 files (ported APIs untouched): (1) HomeRows FactRow used `val when` —
+`when` is a Kotlin keyword; renamed whenText (its template use updated). (2) The
+preparation child Job was built as Job(currentCoroutineContext().job) — the .job
+extension was not imported; now Job(currentCoroutineContext()[Job]) as in the
+DC-54-fixed engine code. (3) Two runAuth { … } calls bound the lambda to the LAST
+parameter (busyText) instead of action — the DC-100 trap inside the new code; both
+now pass action = { … }. (4) The export Json builder used `indent`, which is not a
+kotlinx JsonBuilder property; corrected to prettyPrintIndent. No behavior or
+expectation changed.
