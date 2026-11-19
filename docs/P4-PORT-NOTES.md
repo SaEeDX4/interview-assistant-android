@@ -928,3 +928,231 @@ compilation failed in MainViewModelFakes.kt — FakeCaptureService declares both
 that also notifies listeners: platform declaration clash. The helper is renamed
 changeStatus (its two call sites in start/stop updated); no test uses it externally,
 no behavior changed.
+
+### P4-C2 CI VERIFICATION (2026-11-19)
+
+GitHub Actions run #210 on head 0026754 SUCCESS (1m33s) after two DC-100 fix rounds
+(run #205: VM call-site compile errors; run #208: test-fake JVM signature clash):
+:app:testDebugUnitTest EXECUTED fresh — MainViewModel tests 40/40 PASSED
+(Engine 15, Account 15, Session 10); :app:assembleDebug built; checksums 13/13 OK.
+Run: https://github.com/SaEeDX4/interview-assistant-android/actions/runs/44561399666
+P4-C2 is CI-verified complete. Project test total: 622 green.
+
+## Package P4-C3 — HomeViewModel
+
+The complete logic mirror of the Windows `HomeWindow` code-behind (all six partial
+classes) as one `HomeViewModel` class with regions in the C#'s order, plus the row/
+record types and view seams in a sibling `HomeRows.kt`. Navigation is route state
+(`HomeRoute`) per the P4 architecture note; every view-only interaction is a
+constructor seam with the C# shape (`HomeDialogs`, `HomeFiles`, `HomeClipboard`,
+`HomeShell`, plus the hosted `SettingsPageController` — P4-G — and
+`PreInterviewPageController` — P4-F — surfaces). No Android imports in the VM; no
+fake behavior anywhere: seams are interfaces, tests supply fakes.
+
+Files:
+- `app/src/main/java/com/interviewassistant/app/viewmodels/HomeViewModel.kt` — 3,604 lines
+- `app/src/main/java/com/interviewassistant/app/viewmodels/HomeRows.kt` — 444 lines
+  (MessageKind/InlineMessageState, the dialog/file/clipboard/shell seams, the two
+  hosted-page controller interfaces, FactRow/ReportRow/MetricRow/DeviceRow,
+  personal-field models, DashboardStep, ExportChoice/ExportFormats, HomeFocus,
+  AccountMenuKey, the date-format helpers)
+
+### Per-partial checklist (C# → Kotlin)
+
+- [x] `HomeWindow.xaml.cs` (1,236) → core + Profiles + Interviews + Reports regions:
+  construction (guards registered profile/target/settings in the C#'s order, ask
+  dialog title key by guard name, guard Save/Discard wiring incl. the
+  save-failure-stays-on-the-page behavior), NavigationGuard decisions, signed-out
+  gate via `HomeRoute.gate`, per-page entry actions, workspace/cloud change
+  handling, in-place `Relocalize()` with both guards suspended, dirty indicators,
+  close guard + placement save, About rows; Profiles editor (list label, suspended
+  load, FactRow text/meta exactly, filters all/review/confirmed with
+  unconfirmed-first ordering, ConfirmAll, personal fields generated from
+  `PersonalCategories`, résumé import, new-empty, plan limit, save with Prepared
+  targets → Stale, delete with confirm + transcription-context forget);
+  Interviews editor (list/header, load, title validation, save → Stale, JD import,
+  Prepare: cloud job grant → pipeline with progress → pack saved → readiness
+  invalidated, Use, Delete); Reports (rows from report-carrying sessions only,
+  newest first, preview = questions only, Open/Copy/Export/Delete).
+- [x] `HomeWindow.Account.cs` (835) → Account region: panels + status line/brush,
+  provider buttons + legal sentence, blocking-status message, `AuthFormState`
+  rendering (ApplyAuthState incl. resend countdown), field errors that clear on
+  edit, submit pipeline per mode (validation order: email → forgot branch →
+  password empty → create: short → mismatch), RunAuth success path (workspace,
+  engine, summary loaded, toast, first-run route), the PendingReset pipeline
+  (ticket-scoped wait + call, `requested` callback, error copy incl. the timeout
+  split, Resend), re-authentication (provider confirm vs password prompt with
+  stay-open verify), section loaders with SectionState tickets (Summary/Devices),
+  ApplyAccountLimits retention, billing runner with last-action retry,
+  upgrade/portal, device rows (this-device first) + removal, delete-account flow
+  (dialog choice → re-auth → API delete → local-data question → quiet sign-out),
+  sign-out/switch with the unsaved guard first, the header account menu state +
+  keys over `AccountMenu`.
+- [x] `HomeWindow.Start.cs` (246) → Start region: FocusInterview (active →
+  prepared → first, across profiles), SetupFacts, RenderDashboard over
+  SetupPlanner (step state texts + the four detail lines exactly), ack persist +
+  card/note inverse visibility, primary-action routing (all six actions),
+  PrepareFocusInterview, UseFocusInterview, CompleteFirstRun, DeveloperMode and
+  GoAccount mode switches.
+- [x] `HomeWindow.Readiness.cs` (106) → Readiness region: the page controller's
+  three listener sets wired as the C# wires the page events; footer, Interviews
+  card and sidebar pill all rendered from the one snapshot
+  (RefreshReadinessSurfaces), StartInterviewAsync (confirm-close → first-run →
+  live window → close → start listening with the started toast).
+- [x] `HomeWindow.Help.cs` (213) → Help region: diagnostics values (connection by
+  CloudState, audio device + status, HealthCheck.AnswerSeconds latency, question
+  count), SupportLine (English, signer/OS via seams), DiagnosticsText (friendly
+  lines only), RunHealthCheckAsync (device count, 10 s-bounded service reach,
+  settings-readable probe, disk-writable probe; never throws; type-name-only
+  logging), row presentation (glyphs per DC-67, B.Listening/B.Thinking), the 2 s
+  visibility ticker.
+- [x] `HomeWindow.DataExport.cs` (203) → DataExport region: FileStamp
+  (yyyy-MM-dd) / FileSlug (≤ 40), account export (2 choices, re-auth, save,
+  SecretFilter.cleanChecked, HTML via AccountExportRenderer with plan context /
+  JSON indented), profile export (3 choices, ReloadData guard first, saved
+  profile read, bundle/raw via ExportFile), backup import (SwitchItem guard,
+  limit, size pre-check, preview rows exactly as ConfirmImportAsync's grid,
+  limit re-check, collision name, ImportWithReport, injection alert), error
+  mapping exp_import_newer/too_large/invalid via `describeBundleError`.
+
+Self-test hooks mirrored: `hasUnsavedEdits`, `currentPage`, `editedProfileId`,
+`currentProfileTab`, `authStateForTest`, `profileGuardForTest`,
+`targetGuardForTest`, `showForgotPasswordForTest`, `primaryActionForTest`,
+`helpDiagnosticsTexts`.
+
+### Tests (119 @Test, app/src/test/java/com/interviewassistant/app/viewmodels/)
+
+Fixture: `HomeViewModelFixture.kt` (real MainViewModel + real CloudService over
+the P4-C1/C2 fake OkHttp transports, fixed clocks, recorded toasts/focus) +
+`HomeViewModelFakes.kt` (scripted dialogs/files/clipboard/shell + the two hosted
+page-controller fakes; the settings fake wires its own guard Save/Discard exactly
+as P4-G's controller will).
+
+- HomeNavigationTests (16): start page + clean-at-start (SelfTest), signed-out
+  gate, guard Save/Discard/Stay, ask title per editor, settings-guard save
+  failure/success, close guard (clean/dirty-Stay/dirty-Discard/dialog-open),
+  placement save, account-menu open/move/Escape, signed-out button → Account.
+- HomeRelocalizationTests (4): dirty Persian (RTL) profile draft + dirty flag
+  survive a switch to fa; picker rebuild keeps interview language selections;
+  lists/dashboard re-render; UI-language change persists.
+- HomeProfilesTests (16): suspended load, edit → dirty + indicator, save
+  (trim, fact confirm, toast), filters + ordering, ConfirmAll (tick + nothing
+  pending), personal fields = the real schema (count/keys/600/multiline),
+  personal save, add/delete fact, delete profile (confirm/cancel), new-empty,
+  plan limit, résumé import + oversize refusal.
+- HomeInterviewsTests (13): StateLabel table, load, dirty, blank-title
+  validation, save + toast, Prepared → Stale, new-without-profile alert, prepare
+  flow (job grant → Prepared + pack saved + toast + readiness touched),
+  no-facts decline, prep_limit copy, Use, delete, JD import as pending edit.
+- HomeReportsTests (8): rows only from report sessions, newest first, preview
+  questions + meta with no scores, unreadable preview, copy = RenderText,
+  open writes the viewer copy, export = Render HTML, delete.
+- HomeAccountTests (22): form states + mode transitions, field-edit clears its
+  error, submit validation per mode, sign-in success/failure over fake
+  transports, create-account confirmation-sent, full reset flow (recover → pkce
+  → password set → signed in), resend cooldown, summary/devices section failure
+  + stale list, device removal, billing failure → retry repeats the action,
+  upgrade visibility + checkout, delete-account ordering (dialog → re-auth →
+  DELETE → local-data question) + completion, blocked-subscription ManageBilling,
+  Keep does nothing, sign-out guard Stay/Discard, switch-account state,
+  change password.
+- HomeStartTests (8): planner primaries per facts (SignIn / CompleteProfile ×2 /
+  CreateInterview / PrepareInterview), ack card on/off + persist + primary
+  enable/disable + tooltip, ack-off click is a no-op, step statuses, developer
+  entry hidden in release builds.
+- HomeReadinessTests (8): NotChecked surfaces, all-passed surfaces from one
+  snapshot (pill/footer/badge agree, B.Listening), page StateChanged re-render,
+  pill click + page shown/hidden, page navigation requests, footer Run/Settings,
+  StartInterview closes Home + completes first run, page StartRequested.
+- HomeHelpTests (10): diagnostics values signed-in/out, SupportLine shape
+  (signed/unsigned), DiagnosticsText contains version + friendly lines and no
+  token/exception text, health check all-pass + result line, unreachable service
+  warns only its row, re-entrant call, copy + clipboard-busy error, row
+  presentation.
+- HomeDataExportTests (14): FileSlug/FileStamp tables, bundle error mapping,
+  choice lists (2/3 with localized labels), account HTML/JSON export (re-auth
+  order, file name with the fixed stamp, privacy message cleared), re-auth
+  cancel exports nothing, service failure in the privacy section, profile backup
+  export + read-back, import preview rows (+ optional created/app rows, N0
+  counts), import round-trip, corrupt file → exp_import_invalid, oversize →
+  exp_import_too_large, plan limit refuses the import.
+
+Deferred BY NAME (not built here, per the package split): the SettingsPage
+controller (P4-G) and PreInterviewPage controller (P4-F) implementations — seams
+only; all Compose rendering incl. ExportChoiceList, dialog/toast hosts, account
+menu and page layouts (P4-D/E/F/G); the real IAudioCaptureService (P5) and
+IUpdateService (P6); real-device sign-in/device registration and live-backend
+verification (P2 open items, P4/P6); Compose/androidTest UI tests (no emulator
+in CI — JVM parity tests only, as for P4-A/B/C1/C2).
+
+### Divergences (P4-C3)
+
+- DC-101: WPF's SuppressSelection flag has no counterpart. The VM holds selection
+  as plain bindable state and refresh functions set it directly; user selections
+  enter only through the `on*SelectionChanged` entry points, which apply the
+  C#'s classification (DirtyStateGuard.classifySelection) and guard flow.
+- DC-102: `IsStorageError` on Android = IOException | SecurityException |
+  GeneralSecurityException (extends the DC-81 family to Home's save/open paths:
+  profile, interview, report, export, import, logs).
+- DC-103: LoadDevices / RemoveDevice / DeleteAccount catch sets: the C# catches
+  BackendException | IOException | UnauthorizedAccessException |
+  TaskCanceledException; Kotlin catches BackendException + IOException and
+  rethrows CancellationException per DC-87 (no protected-storage access on these
+  paths, so SecurityException is not expected).
+- DC-104: The reset flow's `requested` callback is invoked inline, not posted
+  through a dispatcher: the composition confines VM coroutines to the UI
+  context, which is the C# Dispatcher.Invoke's guarantee.
+- DC-105: Preparation cancellation: PreparationPipeline.runAsync (P3) has no
+  token parameter, so the VM runs it under a child Job of the calling coroutine;
+  cancellation is cooperative at the pipeline's ensureActive checkpoints (the
+  C# passes its CTS token into the same checkpoints).
+- DC-106: The C#'s Task.Run calls (backup write, health probes) run directly on
+  the VM's coroutine context; thread confinement belongs to the composition
+  (P4-D/E), as with the DC-9 precedent.
+- DC-107: Fact ordering's ThenBy(Company) is ordinal in Kotlin
+  (compareBy/thenBy on String); the C#'s OrderBy compares culture-aware. Both
+  are deterministic; order can differ for mixed-case or accented company names.
+- DC-108: The import name-collision check uses String.equals(ignoreCase = true)
+  (Unicode case folding) for the C#'s CurrentCultureIgnoreCase comparison.
+- DC-109: Diagnostics numbers (latency "0.0", question count, N0 import counts)
+  are formatted with LanguageRegistry.numberFormat (Latin digits, DC-44), the
+  counterpart of the C#'s Loc.Culture formatting.
+- DC-110: OpenReport's catch set: isStorageError | IllegalStateException (the
+  InvalidOperationException counterpart; Win32Exception has no counterpart and
+  is covered by IOException from the shell seam).
+- DC-111: KeyNotFoundException counterparts: WorkspaceStore/ProfileBundle throw
+  NoSuchElementException; the profile-export and account-prepare filters accept
+  it where the C# accepts KeyNotFoundException.
+- DC-112: The account-export prepare-error filter is mapped type by type:
+  SerializationException ↔ JsonException, IllegalArgumentException ↔
+  ArgumentException, IllegalStateException ↔ InvalidOperationException,
+  NoSuchElementException ↔ KeyNotFoundException, NumberFormatException ↔
+  FormatException, NullPointerException ↔ NullReferenceException,
+  UnsupportedOperationException ↔ NotSupportedException, :core
+  InvalidDataException unchanged.
+- DC-113: The C# constructor is an `init` block placed at the END of the class:
+  Kotlin runs property initializers and init blocks in textual order, so every
+  state declaration must exist before the constructor logic executes (the
+  MainViewModel precedent, P4-C2). The init body itself is the C# constructor,
+  step for step.
+- DC-114: HomeViewModel.notify defaults to ToastKind.Success (HomeWindow.Notify's
+  default), deliberately distinct from MainViewModel.toast's Info default.
+- DC-115: DispatcherTimer counterparts are scope Jobs: the 1 s resend countdown
+  (started/stopped by UpdateResend's state) and the 2 s Help diagnostics ticker
+  (started/stopped by page visibility).
+- DC-116: WPF view types in state follow the P4-A brush-key precedent: badge,
+  metric-bar, dashboard-mark and readiness colors are "B.*" key strings;
+  GridLength star weights are filled/rest fractions (MetricRow); Visibility is
+  a boolean. Alpha tints of the badge (0x24/0x66 in the C#) are derived by the
+  view from the same key in P4-D.
+- DC-117: Clipboard-busy is the seam's ClipboardBusyException (the
+  ExternalException counterpart), caught exactly where the C# catches
+  ExternalException (report copy, diagnostics copy) and not where it doesn't
+  (CopyBuildInfo).
+- DC-118: The Authenticode signer and OS version string (About + SupportLine)
+  are constructor seams (codeSigner / osVersion): Android has no Authenticode;
+  the composition supplies the platform values (default: unsigned, empty OS
+  string) until P6/P8 wire the real signing identity.
+- DC-119: FileStamp reads the `today` clock seam (LocalDate) instead of
+  DateTime.Now, for deterministic tests; the production default is
+  LocalDate.now() in the device zone, as in the C#.
