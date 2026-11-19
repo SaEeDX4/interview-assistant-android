@@ -1751,3 +1751,17 @@ first execution check.
   the system Back return to the list (the DC-142 in-place pattern); a programmatic jump (a
   deep link, a failed save landing on Hotkeys) shows the pane directly. At ≥ 720 dp the form
   is the C#'s two-pane layout. Nothing is removed in either form.
+
+### P4-F/G CI fix round (DC-166)
+
+Run #286 on head 57b92c7 failed at :app:compileDebugKotlin, three
+call-site defects in P4-G's new files (the DC-100/DC-120/DC-157 family):
+(1) LiveScreen's pulse used InfiniteTransition.animateFloat without its
+extension import (animateFloatAsState was imported instead); import
+added. (2) SettingsPage imported MessageKind from ui.components; the
+enum lives in viewmodels (HomeRows) — the same package InlineMessage
+itself imports it from; import corrected. (3) SettingsPageControllerImpl
+called the constructor-injected applySettings function-type property
+with named arguments, which Kotlin prohibits for function types; now
+positional (engineChanged, modelChanged order per the declaration, as
+the other two call sites already were).
