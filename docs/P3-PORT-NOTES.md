@@ -1069,3 +1069,29 @@ resolution is being replayed instead of a fresh lookup; while the task result it
 from the build cache no resolution was needed, which is why earlier runs passed. Remedy:
 the CI Gradle invocation now passes --refresh-dependencies, discarding cached resolution
 results so the module is resolved fresh (with the mirror available as fallback).
+
+## CI fix round 7 (2026-11-19, after Actions run #161 on ac8f083)
+
+--refresh-dependencies cured the download failure (the cached-missing-resolution theory
+held: assembleDebug succeeded, all three test tasks executed). The suite ran nearly to the
+end: **286 passed, 2 failed, 1 unfinished by timeout** (289 completed). The two failures:
+
+- **DC-53 correction (GC reflection).** The reflective `getCollectionCount` call must go
+  through the exported `java.lang.management.GarbageCollectorMXBean` interface — invoking
+  on the bean's runtime class (sun.management.GarbageCollectorImpl, non-exported package)
+  throws IllegalAccessException (Rc2EngineTimingTests.fiveMinuteMonologue). Fixed in the
+  test helper.
+- **DC-56 — duplicate JSON keys are a strict-syntax refusal.** StrictJson.DuplicateKeyException
+  now extends StrictJson.SyntaxException (mirroring C#, where one InvalidDataException family
+  covers every uncheckable input), so SecurityAuditExportTests' expected refusal type is
+  thrown for duplicate keys. The one production catch site that treats the two differently
+  (SecretFilter.cleanString: duplicates fail closed to Removed, other syntax errors fall
+  back to text) now catches DuplicateKeyException BEFORE SyntaxException, preserving its
+  exact behavior; ProfileBundle's SyntaxException catches now also refuse duplicate-key
+  documents as invalid/unreadable instead of leaking an IllegalArgumentException — the same
+  fail-closed direction as the C#.
+
+The unfinished test (ProviderTests.stalledStreamAfterTheFirstToken — the Okio stall test
+flagged as top risk in §D7) is being verified in isolation before the next full run: if it
+passes standalone in seconds, the 10-minute task timeout (set in the P2 era for a 39-test
+suite) is simply too small for 345 tests and will be raised.
