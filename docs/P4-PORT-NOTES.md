@@ -1242,3 +1242,16 @@ app (both platforms) the Live VM's LanguageChanged handler re-asserts the SETTIN
 language (RefreshLanguage: Loc.Language = UiLanguage), so a direct Loc poke is
 reverted — the tests now switch through Home.onUiLanguageChanged, the window
 language box's real path (settings first, then re-render). All assertions unchanged.
+
+### P4-C3 CI fix round 8 (DC-122, continued)
+
+Run #230 on head 6fc45e8: 353 executed, ONE failed —
+prepare_RunsPipeline_SavesPack_TouchesReadiness at its readiness assertion. The
+pipeline itself completed (Prepared + pack + status + toast all passed). The
+assertion's premise was wrong against the C#: ReadinessStore.Touch() republishes
+the SAME snapshot instance (verified in both sources), and StateFor on a
+never-run store is NotChecked before and after — so "snapshot replaced OR state
+changed" is unobservable in that state, in C# exactly as in the port. The
+observable effect of InvalidateReadiness is the revision bump inside the
+readiness context string; the test now asserts readinessContext changed.
+Everything else in the test is unchanged.
