@@ -46,6 +46,19 @@ enum class IaGlyph(val codePoint: Int, @DrawableRes val drawable: Int) {
     // device rows' monitor glyph (E7F8) had no drawable in the P4-D set.
     Refresh(0xE72C, R.drawable.ic_glyph_refresh),
     Devices(0xE7F8, R.drawable.ic_glyph_devices),
+    // Added in P4-G (DC-163, additive only): the Live chrome and the Settings page need the
+    // Start button's pause state (E769), the history chevrons (E76B/E76C), the More menu's
+    // Settings (E713), Compact (E73F), Focus (E714) and Focus-restore (E7A7) rows, the reset
+    // buttons' restore glyph (E777) and the profile-gap card's add glyph (E710).
+    Pause(0xE769, R.drawable.ic_glyph_pause),
+    ChevronLeft(0xE76B, R.drawable.ic_glyph_chevron_left),
+    ChevronRight(0xE76C, R.drawable.ic_glyph_chevron_right),
+    Settings(0xE713, R.drawable.ic_glyph_settings),
+    Compact(0xE73F, R.drawable.ic_glyph_compact),
+    Focus(0xE714, R.drawable.ic_glyph_focus),
+    FocusRestore(0xE7A7, R.drawable.ic_glyph_focus_restore),
+    Reset(0xE777, R.drawable.ic_glyph_reset),
+    Add(0xE710, R.drawable.ic_glyph_add),
 }
 
 /** Draws one [IaGlyph] at [size] with [tint] (the XAML renders the glyph font at a font size; here, a square box). */
