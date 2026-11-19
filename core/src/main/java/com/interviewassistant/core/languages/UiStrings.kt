@@ -4,7 +4,7 @@ package com.interviewassistant.core.languages
  * Mirror of `InterviewAssistant.Core/Languages/UiStrings.cs` (TRANSFER-MAP §2, layer: Mirror).
  * Full 1:1 port.
  *
- * Compatibility wrapper over [Loc] (tables live in Languages/i18n/*.json).
+ * Compatibility wrapper over [Loc] (tables live in the Languages/i18n JSON files).
  */
 object UiStrings {
     val keys: Array<String> = arrayOf(
