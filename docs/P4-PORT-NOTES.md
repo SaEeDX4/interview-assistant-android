@@ -1255,3 +1255,15 @@ changed" is unobservable in that state, in C# exactly as in the port. The
 observable effect of InvalidateReadiness is the revision bump inside the
 readiness context string; the test now asserts readinessContext changed.
 Everything else in the test is unchanged.
+
+### P4-C3 CI fix round 9 (DC-123)
+
+Runs #231/#232 TIMED OUT (20m) in prepare_RunsPipeline_SavesPack_TouchesReadiness —
+the test had PASSED its pipeline in run #230 and failed only at the last assertion;
+that assertion failure had masked a hang: runPreparationAsync creates
+`Job(currentCoroutineContext()[Job])` as the prep token (the C# _prepCts pattern)
+but never completes it, so once the test body finishes normally, its runBlocking
+waits forever for the uncompleted child Job — DC-54's exact mechanism, second
+instance (the engine's instance was fixed in P3; this one is new in C3). The token
+now completes in the run's finally. Cancellation semantics unchanged (a later run
+still cancels the previous token; cancelling a completed Job is a no-op).
