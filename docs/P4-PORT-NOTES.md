@@ -1565,3 +1565,57 @@ checker's report of this run embellished two details (a test-class name
 that does not exist and the playbook file names in the checksum step);
 the decisive facts (run SUCCESS, test task EXECUTED, no failures) are
 consistent with the Gradle semantics and the run's status.
+
+## Package P4-F — Account + Help + PreInterview pages and controller (Compose)
+
+Scope: the Account page (signed-out auth form + signed-in dashboard), the Help page, and the
+PreInterview page together with the real `PreInterviewPageController` implementation behind the
+P4-C3 seam. Rebinding: MainActivity builds one `PreInterviewPageControllerImpl` and hands it to
+HomeViewModel through the seam and to HomeScreen for the page composable; HomeScreen's dispatch
+now renders "account", "help" and "preinterview" (the DC-136 throwing factory for PreInterview is
+gone; the Settings factory still throws, P4-G). The P1 placeholder object in
+ui/preinterview/PreInterviewScreen.kt is deleted; the page lives in PreInterviewPage.kt.
+
+Files: ui/preinterview/PreInterviewPageControllerImpl.kt (the C# page's code-behind, 1:1 —
+snapshot-driven render state, the formatted-text relocalization memory, the 8 checks, the three
+test tools, fix routing, lifecycle), ui/preinterview/PreInterviewPage.kt (summary card, checks
+card, tools card), ui/account/AccountPage.kt (header, hero + auth card, the five dashboard
+cards), ui/help/HelpPage.kt (sections, diagnostics card + health rows, About card),
+ui/components/Icons.kt + 2 drawables (additive glyphs, DC-156), HomeScreen.kt (dispatch +
+controller parameter), MainActivity.kt (real controller). Tests:
+ui/preinterview/PreInterviewControllerTests.kt (6 tests over the real MainViewModel fixture) and
+the AuthorizedUse source scan added to Rc5ReadinessTests (the P4-A deferral, closed — the scan
+finds "note_sign_in_to_listen" (MainViewModel.kt:1140) before "confirmAuthorizedUseAsync" (1148)
+before "beginLeaseAsync()" (1160) inside toggleListeningCoreAsync). The resend-cooldown math and
+the dashboard/auth column rules named in the package brief were already covered (Rc5AccountTests,
+P4-A) and are not duplicated. Compose rendering tests (androidTest) cannot run in CI (no
+emulator) — none were written; the controller's render mapping is what the JVM tests pin.
+
+- DC-152: SettingsApplied wiring. C#: PreInterviewPage subscribes to MainWindow.SettingsApplied
+  and re-runs at once when shown, idle and session-free. Android's counterpart signal is the
+  Settings controller's `savedListeners`, which does not exist until P4-G. The controller
+  implements the handler as a public `onSettingsApplied()` with the C#'s exact guards; the
+  subscription itself is wired in MainActivity in P4-G, where the Settings controller lands.
+- DC-153: WindowOnTop check input. C#: CheckLocalAsync reads the Live window's Topmost.
+  Android has no separate Live window in P4 (the Live destination is P4-G), so the check reads
+  `vm.settings.alwaysOnTop` — the persisted setting the Live destination will honor. When P4-G
+  lands, the setting and the window behavior are the same switch, so the check's meaning is
+  unchanged.
+- DC-154: Cancellation model of the checks and tools. C#: three CancellationTokenSources
+  (run/tool/signal, the signal one linked to the run's) plus a DispatcherTimer for the audio
+  tool. Kotlin: standalone `Job` tokens the probes poll (the signal token is a child Job of the
+  run token), and the audio tool's timer + 15 s wait are one 150 ms polling loop. Two Kotlin
+  seams take no token where the C# passes one — `CloudService.refreshAsync()` (P2) and
+  `MainViewModel.testTranscriptionAsync` (P4-C2) — so cancellation there is caller-side: the
+  transcription test runs in a child job the tool abandons, and every write stays guarded by the
+  run generation + context checks, exactly the C#'s Report guard. Observable behavior is the
+  same: a cancelled or replaced run/tool writes nothing and renders nothing.
+- DC-155: Transcription tool execution. C#: TestTranscriptionAsync passes its tool token into
+  `MainViewModel.TestTranscriptionAsync`, whose internal awaits observe it. The Kotlin
+  `testTranscriptionAsync` (P4-C2) takes no token, so the tool runs it in a child job, polls the
+  tool token while it runs, and on cancellation cancels the child and renders nothing — the same
+  observable contract as the C#'s token checks after the await (see DC-154).
+- DC-156: Additive glyphs (the DC-144 precedent). The Account page needs Segoe E72C (the Plan
+  card's Refresh button) and E7F8 (the device rows' monitor), which the P4-D glyph set did not
+  include. Added to IaGlyph as Refresh/Devices with hand-authored vector drawables in the set's
+  Material-style path language; no existing glyph changed.
