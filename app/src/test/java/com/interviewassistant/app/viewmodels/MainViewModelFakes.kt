@@ -49,20 +49,20 @@ class FakeCaptureService : IAudioCaptureService {
         startCalls++
         lastDeviceId = deviceId
         isRunning = true
-        setStatus("ACTIVE")
+        changeStatus("ACTIVE")
     }
 
     override fun stop() {
         stopCalls++
         isRunning = false
-        setStatus("STOPPED")
+        changeStatus("STOPPED")
     }
 
     override fun dispose() {
         disposeCalls++
     }
 
-    fun setStatus(s: String) {
+    fun changeStatus(s: String) {
         status = s
         for (listener in statusChangedListeners.toList()) listener(s)
     }
