@@ -1,10 +1,14 @@
 package com.interviewassistant.app
 
 import android.content.Context
+import android.content.Intent
 import android.os.Handler
 import android.os.Looper
 import com.interviewassistant.app.platform.AndroidNetworkAvailability
 import com.interviewassistant.app.platform.AndroidProcessStats
+import com.interviewassistant.app.platform.ShortcutAction
+import com.interviewassistant.app.platform.ShortcutService
+import com.interviewassistant.app.platform.audio.AudioCaptureService
 import com.interviewassistant.app.services.AppSettings
 import com.interviewassistant.app.services.CloudService
 import com.interviewassistant.app.services.IAudioCaptureService
@@ -19,10 +23,15 @@ import kotlinx.coroutines.SupervisorJob
  * builds the app-wide objects in the C# startup order — settings, then the cloud facade, then the main
  * view model — with the platform seams injected.
  *
- * The view model is built lazily: its capture and update dependencies are the P5/P6 platform services,
- * supplied here by providers that throw a clear [IllegalStateException] until those phases land
- * (P4-PORT-NOTES DC-91). Nothing else waits on them: settings, cloud and the workspace factory are fully
- * live, and the Live UI that first touches the view model arrives in P4-G, after P5/P6.
+ * The view model is built lazily. Its capture dependency is the real P5 platform service
+ * ([audioCaptureService]); its update dependency is the P6 platform service, supplied until then by
+ * a provider that throws a clear [IllegalStateException] (P4-PORT-NOTES DC-91) — nothing fakes it.
+ * Settings, cloud and the workspace factory are fully live.
+ *
+ * The composition also installs the process-wide half of the D2 shortcut surface
+ * ([ShortcutService]): the view-model actions execute the main view model's commands (the
+ * foreground-service notification fires them with no activity alive), and a window action with
+ * no activity installed brings [MainActivity] forward instead.
  */
 class AppComposition(context: Context) {
     private val appContext: Context = context.applicationContext
@@ -35,6 +44,9 @@ class AppComposition(context: Context) {
 
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Default)
     private val mainHandler = Handler(Looper.getMainLooper())
+
+    /** The P5 audio capture service (the C#'s `new AudioCaptureService()`), built once. */
+    val audioCaptureService: AudioCaptureService by lazy { AudioCaptureService(appContext) }
 
     /** The main view model; first access constructs it (see the class doc for why it is lazy). */
     val mainViewModel: MainViewModel by lazy {
@@ -50,10 +62,28 @@ class AppComposition(context: Context) {
         )
     }
 
-    private fun captureService(): IAudioCaptureService =
-        throw IllegalStateException(
-            "Audio capture is not available yet: the IAudioCaptureService platform implementation lands in P5.",
-        )
+    init {
+        ShortcutService.commandHandler = { action ->
+            val vm = mainViewModel
+            when (action) {
+                ShortcutAction.StartPause -> vm.startPauseCommand.execute()
+                ShortcutAction.Stop -> vm.stopCommand.execute()
+                ShortcutAction.Coach -> vm.toggleCoachCommand.execute()
+                ShortcutAction.ResetAdaptive -> vm.resetAdaptiveCommand.execute()
+                else -> Unit // window actions are not the command handler's tier
+            }
+        }
+        ShortcutService.activityStarter = { action ->
+            val intent = Intent(appContext, MainActivity::class.java)
+                .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+            if (action == ShortcutAction.ManualInput) {
+                intent.putExtra(MainActivity.EXTRA_FOCUS_MANUAL, true)
+            }
+            appContext.startActivity(intent)
+        }
+    }
+
+    private fun captureService(): IAudioCaptureService = audioCaptureService
 
     private fun updateService(): IUpdateService =
         throw IllegalStateException(

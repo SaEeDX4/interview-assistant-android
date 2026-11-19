@@ -1,19 +1,32 @@
 package com.interviewassistant.app
 
+import android.Manifest
 import android.app.Activity
+import android.app.PictureInPictureParams
 import android.content.Intent
+import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.view.InputDevice
+import android.view.KeyEvent
+import android.view.WindowManager
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.interviewassistant.app.platform.FocusPlatform
+import com.interviewassistant.app.platform.FocusRestoreRecord
+import com.interviewassistant.app.platform.LiveFocusRequests
 import com.interviewassistant.app.platform.OAuthRedirectBus
+import com.interviewassistant.app.platform.ShortcutAction
+import com.interviewassistant.app.platform.ShortcutService
 import com.interviewassistant.app.ui.components.AppDialog
 import com.interviewassistant.app.ui.components.DialogController
 import com.interviewassistant.app.ui.components.ToastController
@@ -28,6 +41,7 @@ import com.interviewassistant.app.ui.live.LiveScreen
 import com.interviewassistant.app.ui.preinterview.PreInterviewPageControllerImpl
 import com.interviewassistant.app.ui.settings.SettingsPageControllerImpl
 import com.interviewassistant.app.ui.theme.InterviewAssistantTheme
+import com.interviewassistant.app.uistate.FocusPreset
 import com.interviewassistant.app.uistate.HomeRoute
 import com.interviewassistant.app.viewmodels.HomeViewModel
 import com.interviewassistant.app.viewmodels.MainViewModel
@@ -65,6 +79,12 @@ import kotlinx.coroutines.launch
  * The composition's capture/update providers still land in P5/P6; until then the lazy
  * construction fails with their explicit IllegalStateException instead of any fake behavior
  * (DC-91).
+ *
+ * P5: the activity owns the platform launchers and window acts the live-audio phase needs —
+ * the RECORD_AUDIO / POST_NOTIFICATIONS permission flows and the MediaProjection consent for
+ * the capture service (which asks only at a start, never at app start), the D2 hardware-keyboard
+ * shortcut dispatch, the Interview Focus PiP handlers behind [FocusPlatform] (D9), and
+ * keep-screen-on while a session is active (the D8 substitute's second half).
  */
 class MainActivity : ComponentActivity() {
 
@@ -103,6 +123,19 @@ class MainActivity : ComponentActivity() {
         fileBridge.deliverSave(if (result.resultCode == Activity.RESULT_OK) result.data?.data else null)
     }
 
+    // P5 launchers: the capture service asks for these only at a capture start (never at app
+    // start); the activity owns the system dialogs and routes the verdicts back.
+    private val audioPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        composition.audioCaptureService.onAudioPermissionResult(granted)
+        maybeRequestNotificationsPermission()
+    }
+
+    private val notificationsPermission = registerForActivityResult(ActivityResultContracts.RequestPermission()) { }
+
+    private val projectionConsent = registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+        composition.audioCaptureService.deliverProjectionResult(result.resultCode, result.data)
+    }
+
     private val homeViewModelDelegate = lazy { buildHomeViewModel() }
 
     /** The Home view model, built with this activity's shell environment on first use. */
@@ -135,6 +168,11 @@ class MainActivity : ComponentActivity() {
             intent?.getStringExtra(EXTRA_HOME_ROUTE) != null -> Destination.Home
             !settings.authorizedUseAcknowledged || !settings.firstRunCompleted -> Destination.Home
             else -> Destination.Live
+        }
+        installLiveAudioWiring()
+        if (intent?.getBooleanExtra(EXTRA_FOCUS_MANUAL, false) == true) {
+            destination = Destination.Live
+            mainHandler.post { LiveFocusRequests.requestManualInput() }
         }
         setContent {
             InterviewAssistantTheme {
@@ -170,6 +208,139 @@ class MainActivity : ComponentActivity() {
             if (homeViewModelDelegate.isInitialized()) {
                 lifecycleScope.launch { homeViewModel.navigateAsync(HomeRoute.parse(route)) }
             }
+        }
+        // A ManualInput shortcut that had to bring the activity forward (D2): land on Live and
+        // focus the manual question field once it is composed.
+        if (intent.getBooleanExtra(EXTRA_FOCUS_MANUAL, false)) {
+            destination = Destination.Live
+            mainHandler.post { LiveFocusRequests.requestManualInput() }
+        }
+    }
+
+    override fun onDestroy() {
+        ShortcutService.windowHandler = null
+        FocusPlatform.applyHandler = null
+        FocusPlatform.restoreHandler = null
+        super.onDestroy()
+    }
+
+    /**
+     * Hardware-keyboard shortcuts (D2): a key-down from a real keyboard device is matched
+     * against the stored combinations; a match is consumed. Soft-keyboard and remote-control
+     * events (no keyboard device, or a non-keyboard type) never reach the matcher.
+     */
+    override fun dispatchKeyEvent(event: KeyEvent): Boolean {
+        if (event.action == KeyEvent.ACTION_DOWN && event.repeatCount == 0) {
+            val device = event.device
+            if (device != null && device.keyboardType != InputDevice.KEYBOARD_TYPE_NONE &&
+                ShortcutService.onKeyEvent(composition.settings, event.metaState, event.keyCode)
+            ) {
+                return true
+            }
+        }
+        return super.dispatchKeyEvent(event)
+    }
+
+    /**
+     * Leaving PiP is the restore (D9): the full Live screen returns at its prior size, so the
+     * Focus restore record the Live screen reads is cleared here.
+     */
+    override fun onPictureInPictureModeChanged(isInPictureInPictureMode: Boolean) {
+        super.onPictureInPictureModeChanged(isInPictureInPictureMode)
+        if (!isInPictureInPictureMode) FocusRestoreRecord.clear(composition.settings)
+    }
+
+    /**
+     * The P5 wiring this activity owns: the capture service's permission/consent launchers, the
+     * Interview Focus PiP handlers, the D2 window-action handler, and keep-screen-on tracking
+     * the session state (D8).
+     */
+    private fun installLiveAudioWiring() {
+        val capture = composition.audioCaptureService
+        capture.audioPermissionRequester = { audioPermission.launch(Manifest.permission.RECORD_AUDIO) }
+        capture.projectionConsentRequester = { launchProjectionConsent() }
+        FocusPlatform.applyHandler = { preset -> applyInterviewFocus(preset) }
+        FocusPlatform.restoreHandler = { restoreInterviewFocus() }
+        ShortcutService.windowHandler = { action -> onShortcutWindowAction(action) }
+        viewModel.addPropertyChangedListener { name ->
+            if (name == "isListening" || name == "isPaused") {
+                mainHandler.post { updateKeepScreenOn() }
+            }
+        }
+        updateKeepScreenOn()
+    }
+
+    private fun launchProjectionConsent() {
+        val manager = getSystemService(MediaProjectionManager::class.java)
+        projectionConsent.launch(manager.createScreenCaptureIntent())
+    }
+
+    /** POST_NOTIFICATIONS rides along with the first capture start (API 33+): the FGS notification must be visible. */
+    private fun maybeRequestNotificationsPermission() {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) !=
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            notificationsPermission.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    /** The D2 window actions: ToggleWindow flips the destination; ManualInput lands on Live's field. */
+    private fun onShortcutWindowAction(action: ShortcutAction) {
+        when (action) {
+            ShortcutAction.ToggleWindow -> {
+                destination = if (destination == Destination.Live) Destination.Home else Destination.Live
+            }
+            ShortcutAction.ManualInput -> {
+                destination = Destination.Live
+                mainHandler.post { LiveFocusRequests.requestManualInput() }
+            }
+            else -> Unit
+        }
+    }
+
+    /**
+     * Interview Focus (D9): with a session active, record the activity's actual pre-PiP state
+     * and enter PiP at the live aspect ratio. Without a session there is nothing to present —
+     * the dialog has already persisted the preset, exactly as far as the platform act goes.
+     */
+    private fun applyInterviewFocus(preset: FocusPreset) {
+        if (!viewModel.sessionActive) return
+        val decor = window.decorView
+        val density = resources.displayMetrics.density
+        if (decor.width > 0 && decor.height > 0) {
+            FocusRestoreRecord.write(
+                composition.settings,
+                left = 0.0,
+                top = 0.0,
+                width = decor.width / density.toDouble(),
+                height = decor.height / density.toDouble(),
+            )
+        }
+        enterPictureInPictureMode(
+            PictureInPictureParams.Builder()
+                .setAspectRatio(FocusPlatform.pipAspectRatio())
+                .build(),
+        )
+    }
+
+    /** Restore from Focus: expand PiP if it is showing (the system's own restore), and clear the record. */
+    private fun restoreInterviewFocus() {
+        if (isInPictureInPictureMode) {
+            startActivity(
+                Intent(this, MainActivity::class.java)
+                    .addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT),
+            )
+        }
+        FocusRestoreRecord.clear(composition.settings)
+    }
+
+    /** Keep the screen on while a session runs (D8); the flag follows isListening/isPaused. */
+    private fun updateKeepScreenOn() {
+        if (viewModel.sessionActive) {
+            window.addFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
+        } else {
+            window.clearFlags(WindowManager.LayoutParams.FLAG_KEEP_SCREEN_ON)
         }
     }
 
@@ -300,5 +471,8 @@ class MainActivity : ComponentActivity() {
     companion object {
         /** Intent extra carrying a Home route ("settings/audio") for the shell to open (DC-147). */
         const val EXTRA_HOME_ROUTE: String = "com.interviewassistant.app.extra.HOME_ROUTE"
+
+        /** Intent extra: land on Live and focus the manual question field (the D2 ManualInput shortcut). */
+        const val EXTRA_FOCUS_MANUAL: String = "com.interviewassistant.app.extra.FOCUS_MANUAL"
     }
 }
