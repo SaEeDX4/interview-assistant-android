@@ -683,7 +683,18 @@ class Rc2EngineTimingTests {
         // Invoke through the exported GarbageCollectorMXBean interface: the beans' runtime
         // class (sun.management.GarbageCollectorImpl) is in a non-exported package, so a
         // reflective call on the class itself throws IllegalAccessException.
-        val count = Class.forName("java.lang.management.GarbageCollectorMXBean").getMethod("getCollectionCount")
-        return beans.sumOf { b -> count.invoke(b) as Long }
+        val gcBean = Class.forName("java.lang.management.GarbageCollectorMXBean")
+        val count = gcBean.getMethod("getCollectionCount")
+        val name = gcBean.getMethod("getName")
+        // The C# samples GC.CollectionCount(2) — full (generation-2) collections ONLY
+        // (DC-57). The JVM analog is the old-generation collector (G1 Old Generation,
+        // PS MarkSweep, MarkSweepCompact, ConcurrentMarkSweep); young-generation
+        // collections must not be counted. Fallback: if no old-generation bean is
+        // recognised, count all collectors.
+        val oldGen = beans.filter { b ->
+            val n = name.invoke(b) as String
+            n.contains("Old") || n.contains("MarkSweep") || n.contains("Mark Sweep")
+        }
+        return (if (oldGen.isNotEmpty()) oldGen else beans).sumOf { b -> count.invoke(b) as Long }
     }
 }
