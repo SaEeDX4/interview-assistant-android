@@ -2,6 +2,9 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.compose)
+    // P4-B: the settings model (AppSettings) is a @Serializable mirror of the C# class;
+    // same plugin and version as :core (P4-PORT-NOTES DC-83).
+    alias(libs.plugins.kotlin.serialization)
 }
 
 android {
