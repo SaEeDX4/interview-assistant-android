@@ -8,6 +8,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import kotlin.math.max
 
 /** Thumb placement of the slim scrollbar, as fractions of the track (pure geometry, unit-tested). */
