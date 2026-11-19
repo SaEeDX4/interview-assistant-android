@@ -16,12 +16,11 @@ import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
-import kotlinx.coroutines.job
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.supervisorScope
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
@@ -140,8 +139,8 @@ class CloudAuthTests {
          * (The loopback tests' long failure trail — CI runs #75/#79/#80 — was finally traced by a
          * temporary probe in run #81 to the tests' `async` parenting, not to this receiver: a
          * failed plain `async` child of runBlocking cancels the parent job and is rethrown by
-         * runBlocking itself, past any catch around `await()`; the waits are therefore parented
-         * to a SupervisorJob, matching the C# Task semantics the port assumes.)
+         * runBlocking itself, past any catch around `await()`; the waits therefore run under a
+         * supervisorScope, matching the C# Task semantics the port assumes.)
          */
         override suspend fun waitForCode(timeout: Duration): String {
             val outcome = try {
@@ -376,61 +375,67 @@ class CloudAuthTests {
 
     @Test
     fun loopbackAcceptsOnlyMatchingStateOnCallbackPath() = runBlocking {
-        val loop = TestLoopbackReceiver()
-        try {
-            assertTrue(loop.redirectUri.startsWith("http://127.0.0.1:"))
-            // The C#'s wait handle is a Task: a faulted Task never cancels its surroundings —
-            // the fault is observed by awaiting it. A plain `async` child of runBlocking does
-            // not behave that way here (proven by a temporary probe, CI runs #80/#81): its
-            // failure cancels the parent job and runBlocking rethrows it past the catch around
-            // await(). Parenting the wait to a SupervisorJob restores the Task semantics.
-            val wait = async(SupervisorJob(coroutineContext.job)) { loop.waitForCode(20.seconds) }
-            val (wrongCode, _) = httpGet("http://127.0.0.1:${loop.port}/callback?s=forged&code=EVIL")
-            assertEquals(404, wrongCode)
-            assertFalse(wait.isCompleted)
-            val (okCode, okCacheControl) = httpGet(loop.redirectUri + "&code=GOOD")
-            assertEquals(200, okCode)
-            assertEquals("no-store", okCacheControl)
-            assertEquals("GOOD", wait.await())
-        } finally {
-            loop.close()
+        supervisorScope {
+            val loop = TestLoopbackReceiver()
+            try {
+                assertTrue(loop.redirectUri.startsWith("http://127.0.0.1:"))
+                // The wait runs under the test's supervisorScope: the C#'s wait handle is a Task —
+                // a faulted Task never cancels its surroundings; its fault is observed by awaiting
+                // it. A plain `async` child of runBlocking does not behave that way here (proven by
+                // a temporary probe, CI runs #80/#81): its failure cancels the parent job and
+                // runBlocking rethrows it past the catch around await(). The supervisor restores
+                // the Task semantics the port assumes.
+                val wait = async { loop.waitForCode(20.seconds) }
+                val (wrongCode, _) = httpGet("http://127.0.0.1:${loop.port}/callback?s=forged&code=EVIL")
+                assertEquals(404, wrongCode)
+                assertFalse(wait.isCompleted)
+                val (okCode, okCacheControl) = httpGet(loop.redirectUri + "&code=GOOD")
+                assertEquals(200, okCode)
+                assertEquals("no-store", okCacheControl)
+                assertEquals("GOOD", wait.await())
+            } finally {
+                loop.close()
+            }
         }
     }
 
     @Test
     fun loopbackRejectsMalformedAndOversizedRequestsAndKeepsWaiting() = runBlocking {
-        val loop = TestLoopbackReceiver()
-        try {
-            // The C#'s wait handle is a Task: a faulted Task never cancels its surroundings —
-            // the fault is observed by awaiting it. A plain `async` child of runBlocking does
-            // not behave that way here (proven by a temporary probe, CI runs #80/#81): its
-            // failure cancels the parent job and runBlocking rethrows it past the catch around
-            // await(). Parenting the wait to a SupervisorJob restores the Task semantics.
-            val wait = async(SupervisorJob(coroutineContext.job)) { loop.waitForCode(20.seconds) }
-            Socket().use { tcp ->
-                tcp.connect(InetSocketAddress(InetAddress.getByName("127.0.0.1"), loop.port))
-                val s = tcp.getOutputStream()
-                s.write("POST /callback HTTP/1.1\r\nHost: x\r\n\r\n".toByteArray(Charsets.US_ASCII))
-                s.flush()
-                val resp = tcp.getInputStream().bufferedReader().readText()
-                assertTrue(resp.startsWith("HTTP/1.1 400"))
-            }
-            Socket().use { tcp ->
-                tcp.connect(InetSocketAddress(InetAddress.getByName("127.0.0.1"), loop.port))
-                tcp.getOutputStream().write(ByteArray(20_000)) // junk, no request line
-                tcp.getOutputStream().flush()
-            }
-            assertFalse(wait.isCompleted)
-            val (errCode, _) = httpGet(loop.redirectUri + "&error=access_denied&error_description=User%20cancelled")
-            assertEquals(400, errCode)
+        supervisorScope {
+            val loop = TestLoopbackReceiver()
             try {
-                wait.await()
-                fail("expected AuthException")
-            } catch (e: AuthException) {
-                assertEquals("User cancelled", e.message)
+                // The wait runs under the test's supervisorScope: the C#'s wait handle is a Task —
+                // a faulted Task never cancels its surroundings; its fault is observed by awaiting
+                // it. A plain `async` child of runBlocking does not behave that way here (proven by
+                // a temporary probe, CI runs #80/#81): its failure cancels the parent job and
+                // runBlocking rethrows it past the catch around await(). The supervisor restores
+                // the Task semantics the port assumes.
+                val wait = async { loop.waitForCode(20.seconds) }
+                Socket().use { tcp ->
+                    tcp.connect(InetSocketAddress(InetAddress.getByName("127.0.0.1"), loop.port))
+                    val s = tcp.getOutputStream()
+                    s.write("POST /callback HTTP/1.1\r\nHost: x\r\n\r\n".toByteArray(Charsets.US_ASCII))
+                    s.flush()
+                    val resp = tcp.getInputStream().bufferedReader().readText()
+                    assertTrue(resp.startsWith("HTTP/1.1 400"))
+                }
+                Socket().use { tcp ->
+                    tcp.connect(InetSocketAddress(InetAddress.getByName("127.0.0.1"), loop.port))
+                    tcp.getOutputStream().write(ByteArray(20_000)) // junk, no request line
+                    tcp.getOutputStream().flush()
+                }
+                assertFalse(wait.isCompleted)
+                val (errCode, _) = httpGet(loop.redirectUri + "&error=access_denied&error_description=User%20cancelled")
+                assertEquals(400, errCode)
+                try {
+                    wait.await()
+                    fail("expected AuthException")
+                } catch (e: AuthException) {
+                    assertEquals("User cancelled", e.message)
+                }
+            } finally {
+                loop.close()
             }
-        } finally {
-            loop.close()
         }
     }
 
