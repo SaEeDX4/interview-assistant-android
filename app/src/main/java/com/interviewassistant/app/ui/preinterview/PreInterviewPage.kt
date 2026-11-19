@@ -1,6 +1,7 @@
 package com.interviewassistant.app.ui.preinterview
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.ExperimentalFoundationApi
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
@@ -63,6 +64,7 @@ import kotlinx.coroutines.launch
  * details. Everything renders from [PreInterviewPageControllerImpl]'s snapshot-driven state; the
  * sticky action bar (Run all / Start interview) is the shell's (P4-E).
  */
+@OptIn(ExperimentalFoundationApi::class)
 @Composable
 fun PreInterviewPage(
     home: HomeViewModel,

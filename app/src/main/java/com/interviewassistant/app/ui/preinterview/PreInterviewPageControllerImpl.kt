@@ -632,7 +632,7 @@ class PreInterviewPageControllerImpl(
 
     private suspend fun checkTranscriptionConnectAsync(gen: Int) {
         busy(gen, ReadinessCheckId.Transcription, f("pf_busy_stt", vm.settings.transcriptionModel))
-        val transcriber = OpenAiRealtimeTranscriber({ SecretStore.getApiKey() }, vm.transcriberOptions())
+        val transcriber = OpenAiRealtimeTranscriber(apiKeyProvider = SecretStore::getApiKey, vm.transcriberOptions())
         try {
             val connected = CompletableDeferred<Pair<ConnectionStatus, String?>>()
             val listener: (ConnectionStatus, String?) -> Unit = { s, d ->
