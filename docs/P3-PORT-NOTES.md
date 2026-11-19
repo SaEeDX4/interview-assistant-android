@@ -1095,3 +1095,7 @@ The unfinished test (ProviderTests.stalledStreamAfterTheFirstToken — the Okio 
 flagged as top risk in §D7) is being verified in isolation before the next full run: if it
 passes standalone in seconds, the 10-minute task timeout (set in the P2 era for a 39-test
 suite) is simply too small for 345 tests and will be raised.
+
+Round-7 addendum: the first DC-56 push (7ff8202) failed to compile — Kotlin classes are
+final by default and SyntaxException was not declared `open`. Fixed by declaring
+`open class SyntaxException`. (Run #166 was spent on this compile error; no tests ran.)
