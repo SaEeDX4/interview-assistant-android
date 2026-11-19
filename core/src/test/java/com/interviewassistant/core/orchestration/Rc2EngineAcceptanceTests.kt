@@ -23,6 +23,7 @@ import com.interviewassistant.core.providers.ProviderException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertNotNull
@@ -371,7 +372,7 @@ class Rc2EngineAcceptanceTests {
         s.run(15_000)
         s.e.pause()
         val typed = async { s.e.submitManualQuestion("How would you onboard VIP clients?") }
-        while (!typed.isCompleted) s.run(20)
+        while (!typed.isCompleted) { s.run(20); yield() } // DC-55: yield so the async answer can run (C# pumps a thread-pool Task)
         typed.await()
         s.e.startListening()
         askAsync(s, "What do you know about MiCAR?")

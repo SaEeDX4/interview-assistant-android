@@ -19,6 +19,7 @@ import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.yield
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
@@ -113,7 +114,7 @@ class SoakTests {
                 e.pause()
                 s.run(4 * 60_000 / 10) // paused (compressed): no listening
                 val typed = async { e.submitManualQuestion("How would you design a referral bonus that does not attract fraud?") }
-                while (!typed.isCompleted) s.run(20) // virtual time runs while the AI answers
+                while (!typed.isCompleted) { s.run(20); yield() } // virtual time runs while the AI answers (DC-55 yield)
                 typed.await()
                 typedWhilePaused++
                 asked++
@@ -228,7 +229,7 @@ class SoakTests {
                 s.sound(InterviewSimulator.SoundKind.Beep, echo) // a beep while paused is never even heard
                 s.run(20_000)
                 val t = async { e.submitManualQuestion(nextQuestion()) }
-                while (!t.isCompleted) s.run(20)
+                while (!t.isCompleted) { s.run(20); yield() } // DC-55
                 t.await()
                 typed++
                 e.startListening()
@@ -264,7 +265,7 @@ class SoakTests {
                 val before = e.history.size
                 val target = e.history[rnd.next(e.history.size - 1)]
                 val vt = async { e.requestVariant(target.id, listOf(AnswerStyle.VeryShort, AnswerStyle.Technical, AnswerStyle.Example)[variants % 3]) }
-                while (!vt.isCompleted) s.run(20)
+                while (!vt.isCompleted) { s.run(20); yield() } // DC-55
                 vt.await()
                 variants++
                 assertEquals(before, e.history.size)
