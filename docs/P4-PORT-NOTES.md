@@ -1647,3 +1647,107 @@ verified green (:app 468, :core 345, :client 32, :contracts 11). P4-F
 (Account auth+dashboard, Help, PreInterview page + controller,
 DC-152…DC-157) is CI-verified complete. The P1 PreInterviewScreen
 placeholder was deleted from the repo in this package (commit cdbd964).
+
+## Package P4-G — Settings page + controller, Live screen chrome (Compose)
+
+Scope: the last P4 build package. (1) The real `SettingsPageController` behind the P4-C3 seam —
+the DC-136 throwing factory in MainActivity is deleted — with the C# SettingsPage's full editing
+model: category state, live audio preview + Discard revert, save/discard through the guard,
+hotkey validation (jump to Hotkeys + first-bad-field focus + the navigation block the guard's
+Save already provides), per-category reset and Restore-all through the destructive confirm,
+the immediate channel save, and the updates seam consumed as-is. (2) The Settings page
+(ui/settings/SettingsPage.kt) rendered into HomeScreen's dispatch (the shell's Settings footer
+already bound the guard): category list + pane, the 7 panels of TRANSFER-MAP §3.2 rows 11–17.
+(3) The Live destination (ui/live/LiveScreen.kt) in the same activity (DC-143): MainWindow's
+chrome in the static states MainViewModel exposes — header (status pill + pulsing dot, level
+meter, readiness button, adaptive badge, Answer/Coach chip, minutes, Start/Pause/Resume, Stop,
+Help, More), service banner, question card + setup empty state, live transcript, waiting line,
+answer card (bullets / Coach / profile-gap), thinking dots, action bar, manual bar, QuickHelp
+popover (auto-open once per LiveIntroDismissed), the More menu, and the Interview Focus dialog.
+LiveChrome's pure shedding rule decides what the header carries; nothing is deleted, only
+relocated to More. (4) MainActivity hosts the Live/Home destination switch: the app opens on
+Live (the C#'s MainWindow) unless onboarding is owed or a route extra arrives; Home's close /
+show-live callbacks and Live's open-home / open-file callbacks are the switch (DC-143 closed).
+
+Files: services/HotkeyParser.kt (new, DC-158), ui/settings/SettingsPageControllerImpl.kt (new),
+ui/settings/SliderSnap.kt (new), ui/settings/SettingsPage.kt (new),
+ui/live/LiveScreen.kt (the P1 placeholder object replaced by the destination),
+ui/live/AnswerFit.kt (new, DC-164), ui/components/Icons.kt + 9 drawables (additive, DC-163),
+ui/home/HomeScreen.kt (dispatch + controller parameter — the P4-F pattern), MainActivity.kt
+(destination host, real settings controller, Live VM wiring). Deleted: the 7-line
+ui/settings/SettingsScreen.kt placeholder (the Settings page lives in SettingsPage.kt).
+Tests (46 new): services/HotkeyParserTests.kt (6), ui/settings/SettingsPageControllerTests.kt
+(30, over the real MainViewModel fixture), ui/settings/SliderSnapTests.kt (3),
+ui/live/AnswerFitterTests.kt (5 — closes the last Rc5 deferral, see DC-164),
+ui/live/LiveScreenLogicTests.kt (2). LiveChrome's decisions are NOT re-tested (P4-A's
+Rc5LiveWindowTests owns them); Compose rendering tests (androidTest) cannot run in CI (no
+emulator) — none were written. NOTHING in this package is compiled or tested yet: CI is the
+first execution check.
+
+- DC-158: The hotkey parser lands in P4-G, ahead of its service. C#: `HotkeyService.TryParse`
+  is the pure half of the registration service. Android: the Settings save validation is the
+  parser's first consumer, so the parser is ported now as `HotkeyParser` (services/) — exactly,
+  including what comes from `Enum.TryParse<Key>` rather than the app's code: name lookup
+  (case-insensitive), decimal integers (any Int value parses; only 0 = Key.None fails the final
+  check), comma-separated lists combined with OR, and `KeyInterop.VirtualKeyFromKey`'s table (a
+  key with no Win32 code maps to vk 0 and still parses). The OS-registration half stays with the
+  P5 platform service; on Android the stored strings bind to the D2 substitutes (§3.2 row 15),
+  and the strings/defaults are preserved verbatim for cross-platform settings parity.
+- DC-159: Dirty-marking of the two editable combos. C#: model/STT text changes mark the page
+  dirty only when keyboard focus is within the combo (programmatic text sets during load do
+  not). Android: Compose controlled fields have no focus-within signal to mirror; the page's
+  callbacks only ever fire for user edits (selection sets the text through the same callback
+  the C#'s focus rule covers), and every programmatic load runs under the guard's suspend —
+  the same cases the C# rule separates, separated by construction instead.
+- DC-160: DC-152 resolved — the subscription point is ApplySettings, not Saved. C#:
+  `SettingsApplied` is raised by `MainWindow.ApplySettings`, which the Settings page calls for
+  a save, a per-category reset / Restore-all AND a developer-key removal; PreInterviewPage's
+  re-check hangs off that event. The controller's `savedListeners` alone would have missed the
+  removal (it raises no Saved event) and the reset path. Android: the controller takes a
+  constructor-injected `applySettings(engineChanged, modelChanged)` callback; MainActivity's
+  implementation mirrors `MainWindow.ApplySettings` (refresh language, restart audio, the
+  engine branch — apply-live + rebuild-after-session vs build + readiness invalidation) and
+  ends with `preInterviewController.onSettingsApplied()`, whose guards are the C#'s (DC-152).
+  Two halves of the C#'s ApplySettings ride their platform substitutes: hotkey registration is
+  the P5 service's (DC-158), and the appearance half's window effects (Topmost/opacity) are
+  the D8 substitutes (DC-162). DC-153 is likewise resolved by this package as it predicted:
+  the Live destination now exists in the same activity, `alwaysOnTop` remains the single
+  persisted switch the WindowOnTop readiness check reads, and its floating-window effect is
+  the D8 substitute delivered with the platform phase — the check's meaning is unchanged.
+- DC-161: Interview Focus placement is persisted, not yet placed. C#: Apply saves the current
+  placement as the restore record (first time only), computes the preset's placement on the
+  current monitor's work area, moves the window and persists the preset name. Android has no
+  movable window in P4-G (the floating Live window is D8 platform work, P6; PiP placement is
+  system-controlled besides). The dialog (first-use vs regular copy, the Restore action only
+  when a restore record exists, intro-seen recorded after ANY result), the preset radio group
+  and the preset persistence are ported exactly; `applyFocus` persists the preset name only
+  and never writes a FocusRestore* record, so `hasFocusRestore` stays false and the More
+  menu's restore row and the dialog's Restore action stay hidden — no window move is faked.
+- DC-162: Live window chrome mappings (extends DC-137). The XAML header's minimize/maximize/
+  close buttons have no counterpart (the activity owns them). The saved window opacity applies
+  as the destination root's alpha, clamped to the same 0.75–1.0 the C# clamps to. The status
+  pill's level meter is 56 dp wide per TRANSFER-MAP §3.2 row 1 and audit §2.2 (the XAML track
+  is 48); the Audio panel's meter is 200 per the same sources. The service banner, cards,
+  bars and menus otherwise take the XAML's own values.
+- DC-163: Additive glyphs (the DC-144/DC-156 precedent): Pause (E769), ChevronLeft (E76B),
+  ChevronRight (E76C), Settings (E713), Compact (E73F), Focus (E714), FocusRestore (E7A7),
+  Reset (E777), Add (E710), with hand-authored vector drawables in the set's Material-style
+  path language; no existing glyph changed.
+- DC-164: AutoFit ported behaviorally; the last Rc5 deferral is closed. C#:
+  `Rc5ReadinessTests.AutoFit_NeverRefitsTheSameInputs` is a source scan (WPF measuring is not
+  unit-testable) asserting FitAnswer's key guard. Android: the fit decisions are the pure
+  `AnswerFitter` (ui/live/AnswerFit.kt) — the key (U+001F-joined, bullets U+001E, sizes
+  rounded, the OUTER width, the viewport minus the 4 px safety) is committed in `begin`
+  BEFORE any pass, exactly like the C# assigns `_lastFitKey` first; the passes are the C#'s
+  (preferred → compact spacing → proportional sqrt step ×0.98 → −0.5 steps, ≤ 10, never below
+  the VM's readable minimum). `AnswerFitterTests.autoFit_NeverRefitsTheSameInputs` pins the
+  guarantee behaviorally — the same inputs never begin a second fit, mid-fit or after — which
+  is stronger than the scan. The screen drives the fitter from Compose size callbacks (the
+  WPF SizeChanged recursion's counterpart); Rc5ReadinessTests.kt itself is untouched (a
+  verified package), its deferral note is answered by this entry.
+- DC-165: Settings is single-pane below 720 dp. §3.3 lists Settings among the two-pane pages;
+  at compact content widths the 230 dp category list and the 620 dp-capped pane cannot sit
+  side by side, so below 720 dp the page swaps list and pane in place — a title back link plus
+  the system Back return to the list (the DC-142 in-place pattern); a programmatic jump (a
+  deep link, a failed save landing on Hotkeys) shows the pane directly. At ≥ 720 dp the form
+  is the C#'s two-pane layout. Nothing is removed in either form.
