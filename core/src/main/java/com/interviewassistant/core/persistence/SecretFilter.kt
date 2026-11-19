@@ -274,7 +274,7 @@ internal object StrictJson {
     /** The C#'s `JsonDocumentOptions.MaxDepth` for export documents (SecretFilter.ParseOptions). */
     const val ParseMaxDepth = 128
 
-    class SyntaxException(message: String) : Exception(message)
+    open class SyntaxException(message: String) : Exception(message)
     class DuplicateKeyException(message: String) : SyntaxException(message)
 
     fun parse(text: String, maxDepth: Int): JsonElement {
