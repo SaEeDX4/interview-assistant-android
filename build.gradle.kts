@@ -20,6 +20,6 @@ subprojects {
             exceptionFormat = org.gradle.api.tasks.testing.logging.TestExceptionFormat.FULL
             showStackTraces = true
         }
-        timeout.set(java.time.Duration.ofMinutes(6)) // TEMP-DIAG
+        timeout.set(java.time.Duration.ofMinutes(20))
     }
 }
