@@ -154,6 +154,8 @@ class CloudAuthTests {
                     else -> Unit // answered (or unreadable); keep waiting, like the C#
                 }
             }
+            @Suppress("UNREACHABLE_CODE")
+            throw IllegalStateException("unreachable: the wait loop exits only by return or throw")
         }
 
         override fun close() {
