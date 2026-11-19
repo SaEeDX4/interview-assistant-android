@@ -1005,3 +1005,23 @@ Test-code-only adaptations; no production code and no test expectation changed.
   the SSE literal uses `JsonPrimitive(d).toString()` (its JSON representation, what the C#'s
   JsonSerializer.Serialize produced); `Okio.buffer(source)` replaced by the `source.buffer()`
   extension (the static form is removed in Okio 3).
+
+## CI fix round 5 (2026-11-19, after Actions runs #144/#147/#148 — the hanging test)
+
+Run #144 was the first full-suite execution: 99 core tests PASSED, 0 failed, client 28/28 and
+contracts 11/11 green — then `:core:testDebugUnitTest` hit its 10-minute timeout inside
+EngineAcceptanceTests.i_AiFailureUsesSafePreparedAnswerOrActionableMessage. A diagnostic run
+(TEMP-DIAG commits, since reverted) with println checkpoints proved both submitManualQuestion
+calls RETURN and the assertions pass — the test body finishes, but its `runBlocking` never
+returns.
+
+- **DC-54 — the per-answer Job must be completed when the answer finishes.** answerAsync
+  created `Job(currentCoroutineContext()[Job])` — a child of the CALLER's job — and never
+  completed it. A bare child Job keeps its parent waiting forever: harmless under the engine's
+  own scope (the Live path, never awaited), fatal when a test calls submitManualQuestion
+  directly inside runBlocking (the Typed path). C# has no equivalent — a
+  CancellationTokenSource needs no completion signal. Fix (production code, InterviewEngine):
+  answerAsync is now a thin wrapper that creates the Job, delegates to answerAsyncImpl, and
+  calls `job.complete()` in a finally. Cancellation semantics unchanged (cancelAnswer still
+  cancels the same Job object; complete() on a cancelled job is a no-op). This was the only
+  `Job(parent)` construction in the codebase (grep-verified across :core and :client).
