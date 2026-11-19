@@ -84,7 +84,7 @@ class HomeFixture(val cloud: VmCloudFixture, initial: HomeRoute? = null) {
     ): InterviewTarget {
         val tg = InterviewTarget(profileId = profileId, jobTitle = title, company = company)
         store().saveTarget(tg)
-        home.refreshTargets()
+        home.refreshTargets(tg.id)
         return store().getTarget(tg.id)!!
     }
 

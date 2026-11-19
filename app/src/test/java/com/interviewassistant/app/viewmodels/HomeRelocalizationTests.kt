@@ -49,7 +49,7 @@ class HomeRelocalizationTests {
         f.home.profileHeadline = "عنوان آزمایشی"
         assertTrue(f.home.profileGuardForTest.isDirty)
 
-        Loc.language = "fa" // the switch relocalizes Home in place (Loc listener)
+        f.home.onUiLanguageChanged("fa") // the window language box: settings first, then every window re-renders
 
         assertTrue(LanguageRegistry.isRtl("fa"))
         assertTrue(Loc.isRtl)
@@ -74,7 +74,7 @@ class HomeRelocalizationTests {
         f.home.targetAnswerLanguageCode = "fa"
         assertTrue(f.home.targetGuardForTest.isDirty)
 
-        Loc.language = "de"
+        f.home.onUiLanguageChanged("de")
 
         // The pickers were rebuilt (auto/same first, then every language) and the selections kept.
         assertEquals("auto", f.home.interviewLanguageItems.first().code)
@@ -92,7 +92,7 @@ class HomeRelocalizationTests {
         f.home.navigateAsync(HomeRoute("start"))
         val englishStep = f.home.dashboardSteps.first().stateText
         val englishLabel = f.home.profileItems.first().label
-        Loc.language = "fa"
+        f.home.onUiLanguageChanged("fa")
         assertEquals("start", f.home.currentPage)
         assertEquals(Loc.t("gs_status_done"), f.home.dashboardSteps.first().stateText)
         assertTrue(englishStep.isNotEmpty())
