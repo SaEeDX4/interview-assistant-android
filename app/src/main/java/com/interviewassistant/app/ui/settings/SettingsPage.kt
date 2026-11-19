@@ -66,7 +66,7 @@ import com.interviewassistant.app.ui.components.IaInfoTip
 import com.interviewassistant.app.ui.components.IaInlineMessage
 import com.interviewassistant.app.ui.components.IaLevelMeter
 import com.interviewassistant.app.ui.components.Input
-import com.interviewassistant.app.ui.components.MessageKind
+import com.interviewassistant.app.viewmodels.MessageKind
 import com.interviewassistant.app.ui.components.PasswordInput
 import com.interviewassistant.app.ui.components.iaButtonFocusRing
 import com.interviewassistant.app.ui.home.bindableState

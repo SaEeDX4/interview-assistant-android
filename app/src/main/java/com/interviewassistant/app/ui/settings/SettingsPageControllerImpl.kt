@@ -412,7 +412,7 @@ class SettingsPageControllerImpl(
         guard.suspend().use { keyText = "" }
         keyStatus = Loc.t("set_key_removed")
         keyRemoved = true
-        applySettings(engineChanged = true, modelChanged = true)
+        applySettings(true, true)
     }
 
     fun onModelTextChanged(text: String) {
