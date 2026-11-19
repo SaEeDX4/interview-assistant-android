@@ -932,3 +932,40 @@ name to the App/UI (P4) package, or mapped to its P7/CI counterpart. No file is 
   no `[truncated]` signature, no literal NUL/VT/FF bytes; string/comment-stripped brace/paren/bracket
   balance clean (two apparent anomalies traced to nested-quote string templates + CSS literals, i.e.
   checker artifacts, verified by inspection).
+
+---
+
+## CI fix round 1 (2026-11-19, after Actions run #125 on f449061 — :core:compileDebugKotlin, 37 errors)
+
+All fixes are compile-level Kotlin/JVM adaptations; no behavior, literal, or test expectation changed.
+
+- **DC-45 — `dotNetRegex` construction.** `Regex(java.util.regex.Pattern)` is an internal Kotlin
+  constructor. The helper now builds the Regex from the pattern string with embedded JVM flags:
+  `(?U)` always (UNICODE_CHARACTER_CLASS) and `(?iu)` added when ignoreCase (CASE_INSENSITIVE +
+  UNICODE_CASE) — the same flag set as before. FactValidator's `clauseBoundary` (the one DOTALL
+  pattern) uses `(?iuUs)` the same way. Both `java.util.regex.Pattern` imports removed.
+- **DC-46 — nested block comments.** Kotlin block comments nest, so the `/*` inside comment text
+  `Languages/i18n/*.json` (UiStrings) and `targets/*.json, packs/*.json, sessions/*.json`
+  (ProfileBundle KDoc) opened nested comments and swallowed code (this also caused the
+  `ProfileBundle.FormatName/FormatVersion` unresolved errors). Comments reworded; no code changed.
+  (The same character sequence inside a WorkspaceStore string literal is harmless and untouched.)
+- **DC-47 — FactValidator claim type.** `isSupported`'s `claim` parameter is
+  `kotlin.text.MatchResult` (the C#'s `System.Text.RegularExpressions.Match`), now fully qualified
+  so it no longer binds to QuestionMatcher's own `MatchResult` data class in the same package.
+- **DC-48 — `regexEscape` single home.** The faithful .NET `Regex.Escape` port already lives in
+  `knowledge/TargetContext.kt`; QuestionExtractor's import corrected from `ingestion` to
+  `knowledge` (QuestionClassifier already imported it from there).
+- **DC-49 — InterviewEngine imports + constructor shadowing.** Imports corrected to the real
+  packages (`turn.DuplicateGuard`, `languages.LanguageDetector` — the C# namespaces differ from
+  the Kotlin package layout). In `init`, the constructor parameters `clock`/`options` shadow the
+  like-named properties, so the two uses are now `this.clock` / `this.options` (the properties
+  already carry the C#'s `?? new` defaults).
+- **DC-50 — OkHttp coroutine bridge calls.** `CancellableContinuation.resume(value, onCancellation)`
+  is a member needing the second argument: call sites now pass `null`; `resumeWithException` is
+  the kotlinx extension and is now imported in OpenAiAuthProbe / OpenAiChatAnswerProvider.
+- **DC-51 — RealtimeTranscriber constructor disambiguation.** A bare lambda matches both the
+  `suspend () -> String?` primary and the `() -> String?` secondary constructor. The secondary's
+  delegation now passes `suspend { apiKeyProvider() }`; ProviderTests call sites that the C#
+  binds to the sync `Func<string?>` constructor now name it (`apiKeyProvider = { "k" }`).
+- **DC-52 — ExportLabels chronology.** `java.time.chrono.Chronology` has no `fromLocale`; the
+  JVM counterpart of the C#'s culture calendar lookup is `Chronology.ofLocale(locale)`.
