@@ -1765,3 +1765,17 @@ called the constructor-injected applySettings function-type property
 with named arguments, which Kotlin prohibits for function types; now
 positional (engineChanged, modelChanged order per the declaration, as
 the other two call sites already were).
+
+### P4-G CI fix round 2 (DC-167)
+
+Run #289 on head 496f593: compiled and assembled; :app:testDebugUnitTest
+EXECUTED — 514 tests, 4 FAILED, all in HotkeyParserTests with the same
+delta: expected modifiers=6, actual 3, for Ctrl+Alt combos. Diagnosis
+proven against the C# before changing anything: HotkeyService.cs defines
+MOD_ALT=1, MOD_CONTROL=2, MOD_SHIFT=4, MOD_WIN=8, so Ctrl+Alt = 3 — the
+parser port is faithful (its constants match the C# verbatim) and the
+four test expectations were mis-derived (the same file's other
+expectations — Ctrl alone = 2, Win+Shift+Alt = 0x1|0x4|0x8 — agree with
+the parser and passed). The test expectations were corrected 6 → 3;
+no production code and no C#-derived behavior changed (the DC-122
+precedent: a test premise wrong against the C# is a test defect).
