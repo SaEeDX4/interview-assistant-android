@@ -1119,3 +1119,28 @@ Two findings remain, both in the timing/provider area:
   is still unproven. It is being re-run with the timing tests under a 6-minute cap; if it
   still does not finish in seconds there, the provider's AsyncTimeout path (which closes
   the wrapped source from timedOut()) gets a dedicated dissection.
+
+## CI fix round 9 (2026-11-19, after Actions run #172 on 168e356) — DC-58
+
+Diagnostic run #172: **DC-57 verified** (fiveMinuteMonologue PASSED; both timing tests
+green). The stalled-stream test, given a full 6-minute task budget alongside only 10 other
+tests, still never finished — a genuine hang in the port, now root-caused and reproduced
+locally on this machine (JDK 17 + Okio 3.6.0, the version OkHttp 4.12.0 carries):
+
+- **DC-58 — timedOut() must close the RAW source, not the timeout-wrapped source.** The
+  provider's AsyncTimeout.timedOut() closed the source returned by `timeout.source(...)`.
+  That wrapper's close() calls `timeout.enter()`, which throws
+  `IllegalStateException: Unbalanced enter/exit` while a read is in flight; the exception
+  was swallowed by the handler's own catch, the close never happened, and the stalled
+  read stayed blocked forever. Fix: timedOut() closes `rawSource` (the unwrapped body
+  source). Local repro before the fix hung identically; after the fix the blocked read
+  throws InterruptedIOException at the 300 ms idle deadline and the loop exits in
+  343 ms, mapping to ProviderException(Timeout) exactly as the test expects. This mirrors
+  the C#, where cancelling the idle CancellationTokenSource aborts the pending read.
+
+Also in this round, the diagnostic scaffolding comes out and the suite goes back to the
+full run, with one permanent change: the per-task test timeout rises from 10 to 20
+minutes. The 10-minute cap dated from the P2-era 39-test suite; the 345-test P3 suite
+legitimately needs more (run #161 executed 289 tests in ~10 minutes with everything
+working). This is a CI budget, not a test change — every test keeps its own internal
+time bounds exactly as ported.
