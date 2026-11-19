@@ -186,6 +186,9 @@ class MainViewModel(
     val toggleCoachCommand: RelayCommand
     val resetAdaptiveCommand: RelayCommand
 
+    /** The Loc subscription (named so [disposeAsync] can unsubscribe — the C# event lives for the app's lifetime; a disposed VM must not keep re-rendering). */
+    private val languageChangedHandler: () -> Unit = { post { refreshLanguage() } }
+
     private val updateTimerJob: Job
     private val diagTimerJob: Job
     private var accountTimerJob: Job? = null
@@ -230,7 +233,7 @@ class MainViewModel(
                 openWorkspaceForCurrentAccount()
             }
         }
-        Loc.addLanguageChangedListener { post { refreshLanguage() } }
+        Loc.addLanguageChangedListener(languageChangedHandler)
         capture.frameReadyListeners += { frame, db -> onAudioFrame(frame, db) }
         capture.statusChangedListeners += { s -> post { onCaptureStatus(s) } }
         diagTimerJob = scope.launch {
@@ -1643,6 +1646,7 @@ class MainViewModel(
     val engine: InterviewEngine? get() = _engine
 
     suspend fun disposeAsync() {
+        Loc.removeLanguageChangedListener(languageChangedHandler)
         diagTimerJob.cancel()
         updateTimerJob.cancel()
         accountTimerJob?.cancel()
