@@ -16,6 +16,8 @@ import org.junit.Test
  * Contract fixtures for the `:contracts` mirror (TRANSFER-MAP §5.4): the exact wire JSON of the
  * Windows contracts under `JsonSerializerDefaults.Web` (camelCase names, defaults and nulls written,
  * `-1` sentinels, ISO-8601 UTC dates, lowercase GUIDs). A serialization drift on either side fails here.
+ * Discipline: any change to a DTO's wire name, default, or sentinel updates the matching literal
+ * here in the same commit — the fixtures are the executable form of §5.4.
  */
 class ApiContractsJsonTest {
     private val json = ContractJson.instance
