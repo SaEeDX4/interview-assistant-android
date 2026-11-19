@@ -24,7 +24,7 @@ import okhttp3.ResponseBody
 import okhttp3.ResponseBody.Companion.toResponseBody
 import okio.Buffer
 import okio.BufferedSource
-import okio.Okio
+import okio.buffer
 import okio.Source
 import okio.Timeout
 import org.junit.Assert.assertEquals
@@ -41,7 +41,7 @@ import org.junit.Test
  */
 class ProviderTests {
 
-    private class StubInterceptor(private val f: (String?) -> Response) : Interceptor {
+    private class StubInterceptor(private val f: (Request) -> Response) : Interceptor {
         @Volatile
         var lastBody: String? = null
 
@@ -53,7 +53,7 @@ class ProviderTests {
                 buffer.readUtf8()
             }
             lastBody = body
-            return f(body)
+            return f(request)
         }
     }
 
@@ -69,7 +69,7 @@ class ProviderTests {
     private fun sse(vararg deltas: String): String {
         val sb = StringBuilder()
         for (d in deltas) {
-            val escaped = Json.encodeToString(kotlinx.serialization.json.JsonPrimitive(d))
+            val escaped = kotlinx.serialization.json.JsonPrimitive(d).toString()
             sb.append("data: {\"choices\":[{\"delta\":{\"content\":").append(escaped).append("}}]}\n\n")
         }
         sb.append("data: [DONE]\n\n")
@@ -100,7 +100,7 @@ class ProviderTests {
     }
 
     private class StallingBody(first: String) : ResponseBody() {
-        private val source: BufferedSource = Okio.buffer(StallingSource(first))
+        private val source: BufferedSource = StallingSource(first).buffer()
         override fun contentType(): okhttp3.MediaType? = "text/event-stream".toMediaType()
         override fun contentLength(): Long = -1
         override fun source(): BufferedSource = source
