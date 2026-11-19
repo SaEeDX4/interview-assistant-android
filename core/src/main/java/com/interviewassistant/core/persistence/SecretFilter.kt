@@ -204,11 +204,12 @@ object SecretFilter {
         if (t.length > 1 && (t[0] == '{' || t[0] == '[')) {
             val inner: JsonElement? = try {
                 StrictJson.parse(s, StrictJson.ParseMaxDepth)
-            } catch (e: StrictJson.SyntaxException) {
-                null // not JSON: treat as text
             } catch (e: StrictJson.DuplicateKeyException) {
                 // A duplicate property name: cannot be checked, so not exported (fail closed).
+                // (Caught before its SyntaxException supertype — DC-56.)
                 return Pair(Removed, true)
+            } catch (e: StrictJson.SyntaxException) {
+                null // not JSON: treat as text
             }
             if (inner != null) {
                 if (depth + 1 > MaxDepth) return Pair(Removed, true) // fail closed
@@ -274,7 +275,7 @@ internal object StrictJson {
     const val ParseMaxDepth = 128
 
     class SyntaxException(message: String) : Exception(message)
-    class DuplicateKeyException(message: String) : IllegalArgumentException(message)
+    class DuplicateKeyException(message: String) : SyntaxException(message)
 
     fun parse(text: String, maxDepth: Int): JsonElement {
         val p = Parser(text, maxDepth)
