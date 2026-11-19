@@ -313,8 +313,8 @@ class FactRow(val fact: ProfileFact, val initial: FactStatus) : ObservableObject
             val line = fact.provenance?.let { p ->
                 if (p.snippet.isNotEmpty() && fact.source != FactSource.Manual) " · " + Loc.f("fact_line", p.lineStart) else ""
             } ?: ""
-            val when = (fact.updatedUtc ?: fact.createdUtc)?.let { " · " + formatShortDate(it) } ?: ""
-            return "$kind · $source$line$when"
+            val whenText = (fact.updatedUtc ?: fact.createdUtc)?.let { " · " + formatShortDate(it) } ?: ""
+            return "$kind · $source$line$whenText"
         }
 
     /** Re-raises every property (the C#'s `RaiseAll` after a language switch: Text/Meta are computed). */

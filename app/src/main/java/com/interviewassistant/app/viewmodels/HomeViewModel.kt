@@ -1307,7 +1307,7 @@ class HomeViewModel(
         // A new run cancels the previous one (the C#'s _prepCts): a child job of this coroutine,
         // so cancelling it never cancels the caller.
         prepJob?.cancel()
-        val token = Job(currentCoroutineContext().job)
+        val token = Job(currentCoroutineContext()[Job])
         prepJob = token
         tg.preparation = PreparationState.Preparing
         tg.preparationError = null
@@ -2149,16 +2149,16 @@ class HomeViewModel(
                 return
             }
             var confirm = false
-            runAuth {
+            runAuth(action = {
                 val (ok, needsConfirmation, error) = vm.cloud.signUpAsync(email, pw)
                 confirm = ok && needsConfirmation
                 Pair(ok, error)
-            }
+            })
             if (confirm && !vm.cloud.isSignedIn && auth.toSignIn()) {
                 authMessage.show(f("acct_confirm_email_sent", ltrIsolated(email)), MessageKind.Success)
             }
         } else {
-            runAuth { vm.cloud.signInAsync(email, pw) }
+            runAuth(action = { vm.cloud.signInAsync(email, pw) })
         }
     }
 
@@ -3275,7 +3275,7 @@ class HomeViewModel(
 
     // ================= data export & import (HomeWindow.DataExport.cs) =================
 
-    private val exportJson: Json = Json { prettyPrint = true; indent = "  " }
+    private val exportJson: Json = Json { prettyPrint = true; prettyPrintIndent = "  " }
 
     /** The account export's two choices (the C#'s ExportDialog.ChooseAccountFormatAsync list). */
     fun accountExportChoices(): List<ExportChoice> = listOf(
