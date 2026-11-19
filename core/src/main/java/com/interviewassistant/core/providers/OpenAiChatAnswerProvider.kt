@@ -13,6 +13,7 @@ import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.flow
 import kotlinx.coroutines.isActive
+import kotlinx.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.SerializationException
@@ -157,7 +158,7 @@ class OpenAiChatAnswerProvider(
                             }
 
                             override fun onResponse(call: Call, response: Response) {
-                                if (cont.isActive) cont.resume(response) else response.close()
+                                if (cont.isActive) cont.resume(response, null) else response.close()
                             }
                         })
                         cont.invokeOnCancellation { call.cancel() }

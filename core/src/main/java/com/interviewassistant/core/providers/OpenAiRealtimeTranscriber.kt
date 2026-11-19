@@ -100,7 +100,7 @@ class OpenAiRealtimeTranscriber(
 
     /** The credential is fetched synchronously per (re)connection from a plain API-key provider. */
     constructor(apiKeyProvider: () -> String?, options: RealtimeTranscriberOptions? = null) :
-        this({ apiKeyProvider() }, options)
+        this(suspend { apiKeyProvider() }, options)
 
     private val opt: RealtimeTranscriberOptions = options ?: RealtimeTranscriberOptions()
     private val audio = Channel<ByteArray>(30, BufferOverflow.DROP_OLDEST)
