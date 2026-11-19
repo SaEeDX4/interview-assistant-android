@@ -904,3 +904,18 @@ Deferred BY NAME:
    throws into callers) — the lease/stop assertions do not depend on it.
 7. MainActivity's `viewModel` lazy val is currently unused (warning only);
    the Live UI consumes it in P4-G.
+
+### P4-C2 CI fix round 1 (DC-100)
+
+Run #205 on head 6eeb989 failed at :app:compileDebugKotlin — three call-site defects
+in MainViewModel.kt (the ported APIs were correct; the VM's uses of them were not):
+(1) CloudState imported from com.interviewassistant.client — the enum lives in
+com.interviewassistant.app.services (CloudService.kt); import corrected.
+(2) ConnectionToastGate constructed with a trailing lambda, which Kotlin binds to
+the LAST parameter (minInterval) instead of the first (now); the clock lambda is now
+passed explicitly in parentheses — same fix in MainViewModelFixture.kt.
+(3) OpenAiRealtimeTranscriber constructions were ambiguous between the
+credentialProvider (suspend) primary constructor and the apiKeyProvider secondary;
+all four call sites now use named arguments (credentialProvider = … /
+apiKeyProvider = …), following the DC-51 precedent. No behavior or expectation
+changed; no ported file was modified.
