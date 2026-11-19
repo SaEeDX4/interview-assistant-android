@@ -1426,3 +1426,17 @@ await) made the method non-void, which JUnit4 rejects for the whole class
 (18 tests were masked). Both methods converted to block bodies; bodies and
 assertions unchanged. A sweep of the other UI tests found no other
 expression-bodied tests outside the runBlocking pattern.
+
+### P4-D CI VERIFICATION — COMPLETE (2026-11-19)
+
+GitHub Actions run #246 on head ddbd3a3 — SUCCESS (1m16s):
+:app:testDebugUnitTest EXECUTED fresh — no FAILED test lines; the two
+previously class-masked suites ran in full (DialogControllerTest 13/13,
+Rc5ComponentAccessibilityTests 5/5), so all 70 P4-D tests pass and :app
+stands at 423/423. assembleDebug built; checksums 13/13 OK; other modules
+FROM-CACHE on identical inputs. Project total: 811 tests verified green
+(:app 423, :core 345, :client 32, :contracts 11). P4-D (theme + components
++ Toast/Dialog/Popover hosts + ExportChoiceList, DC-124…DC-135) is
+CI-verified complete. Compose rendering itself remains emulator-only and
+unverified by CI — the standing honesty constraint; the component rules
+with logic are pinned by the JVM suites above.
