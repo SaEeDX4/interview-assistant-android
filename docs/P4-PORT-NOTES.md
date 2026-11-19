@@ -1186,3 +1186,12 @@ Run #218 on head 6d668a3: main code compiled; test compilation failed in
 HomeRelocalizationTests — the language pickers are LangItem(label, code) (HomeRows),
 and the test read .value (the ListItem member) instead of .code. Test-side member
 name corrected at both assertions; the asserted values ("auto"/"same") are unchanged.
+
+### P4-C3 CI fix round 4 (DC-120, continued)
+
+Run #220 on head 061f687: test compilation failed in HomeViewModelFakes —
+FakeHomeClipboard declares `var text: String?` (JVM setter setText(String)) and
+implements HomeClipboard.setText: the same clash, inside the fake (the parent's
+round-2 sweep had dismissed this family at file level; the interface method itself
+was never the problem). The fake's recorded-content property is renamed lastText;
+the two test reads (HomeHelpTests, HomeReportsTests) updated. Assertions unchanged.
