@@ -132,7 +132,7 @@ object HomeLayout {
     }
 
     /**
-     * The Reports list's share of the body width on wide layouts: the C#'s 32*/68* star sizing
+     * The Reports list's share of the body width on wide layouts: the C#'s 32-star / 68-star sizing
      * with a 260 dp minimum on each pane, expressed as a fraction (the star share 0.32, widened
      * when the minimum pane width bites, narrowed when the preview's minimum does) — always
      * within 0.2–0.5.
