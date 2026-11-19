@@ -122,8 +122,8 @@ class L10nDateAndBidiTests {
         // Only the weekday goes: the rest of each culture's long date pattern is used as it is (no generic fallback).
         for (lang in languages) {
             val culture = ExportLabels.culture(lang)
-            val chronology = if (LanguageRegistry.usesGregorianCalendar(lang)) IsoChronology.INSTANCE else java.time.chrono.Chronology.fromLocale(culture)
-            val pattern = DateTimeFormatterBuilder().getLocalizedDateTimePattern(FormatStyle.LONG, null, chronology, culture)
+            val chronology = if (LanguageRegistry.usesGregorianCalendar(lang)) IsoChronology.INSTANCE else java.time.chrono.Chronology.ofLocale(culture)
+            val pattern = DateTimeFormatterBuilder.getLocalizedDateTimePattern(FormatStyle.LONG, null, chronology, culture)
             val stripped = ExportLabels.longDateWithoutWeekday(culture)
             assertTrue("$lang: $pattern -> $stripped", stripped.length < pattern.length || !pattern.contains("ddd"))
         }
