@@ -1054,3 +1054,9 @@ failure, not a project error. Remedy: settings.gradle.kts now lists Google's off
 Maven Central mirror (maven-central.storage-download.googleapis.com/maven2) as a fallback
 repository after mavenCentral(); content is identical, resolution order unchanged when the
 primary host is healthy.
+
+Correction to the note above (run #157 on 07fe865): the build still failed identically and
+the log shows ONLY repo.maven.apache.org was searched — the
+kotlinCompilerPluginClasspathDebug configuration does not resolve against
+dependencyResolutionManagement repositories; it uses the pluginManagement set. The mirror
+has therefore also been added to pluginManagement repositories in settings.gradle.kts.
