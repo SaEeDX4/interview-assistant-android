@@ -919,3 +919,12 @@ credentialProvider (suspend) primary constructor and the apiKeyProvider secondar
 all four call sites now use named arguments (credentialProvider = … /
 apiKeyProvider = …), following the DC-51 precedent. No behavior or expectation
 changed; no ported file was modified.
+
+### P4-C2 CI fix round 2 (DC-100, continued)
+
+Run #208 on head d0e1ef9: main code compiled (:app:assembleDebug completed); test
+compilation failed in MainViewModelFakes.kt — FakeCaptureService declares both
+`override var status` (JVM setter setStatus(String)) and a helper `fun setStatus(s)`
+that also notifies listeners: platform declaration clash. The helper is renamed
+changeStatus (its two call sites in start/stop updated); no test uses it externally,
+no behavior changed.
