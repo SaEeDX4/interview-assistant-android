@@ -8,6 +8,7 @@ import java.time.ZoneId
 import java.time.ZoneOffset
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
+import kotlinx.serialization.json.JsonNull
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonPrimitive
 
@@ -223,6 +224,7 @@ object AccountExportRenderer {
 
     private fun str(e: JsonElement?, name: String): String = when (val v = prop(e, name)) {
         is JsonPrimitive -> when {
+            v is JsonNull -> "" // C# Str: a JSON null reads as "" (DC-59); kotlinx JsonNull is a JsonPrimitive whose toString() is "null"
             v.isString -> v.content
             else -> v.toString() // numbers keep their raw text; booleans render "true"/"false"
         }
