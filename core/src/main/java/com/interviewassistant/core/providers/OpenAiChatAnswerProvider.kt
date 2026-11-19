@@ -35,7 +35,6 @@ import okhttp3.Request
 import okhttp3.RequestBody.Companion.toRequestBody
 import okhttp3.Response
 import okio.AsyncTimeout
-import okio.Source
 import okio.buffer
 
 /**
@@ -199,19 +198,21 @@ class OpenAiChatAnswerProvider(
         response.use { resp ->
             val rawSource = resp.body!!.source()
             var timedOut = false
-            var timedSource: Source? = null
             val timeout = object : AsyncTimeout() {
                 override fun timedOut() {
                     timedOut = true
-                    // Cancelling the call breaks a real socket read; closing the source releases a stalled one.
+                    // Close the RAW source, never the timeout-wrapped one: the wrapper's
+                    // close() re-enters this AsyncTimeout and throws "Unbalanced enter/exit"
+                    // while a read is in flight, which would leave the stalled read blocked
+                    // forever (DC-58, reproduced locally against Okio 3.6). Closing the raw
+                    // source breaks a real socket read and releases a stalled one alike.
                     try {
-                        timedSource?.close()
+                        rawSource.close()
                     } catch (_: Exception) {
                     }
                 }
             }
             val source = timeout.source(rawSource)
-            timedSource = source
             val reader = source.buffer()
             val streamStarted = System.nanoTime()
             var gotFirst = false
