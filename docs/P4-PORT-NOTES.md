@@ -677,3 +677,230 @@ derivation table from `BackendClient.cs`, and the settable `Source` diagnostic.
 5. `AppLinkRedirectReceiver.create`'s factory lambda shape
    (`(String) -> String`) is taken from Platform.kt as written; if its signature
    differs at compile time this is the first place it shows.
+
+### P4-C1 CI VERIFICATION (2026-11-19)
+
+Pushed in 7 commits (head d0d0f1b, 200 commits). GitHub Actions run #198 SUCCESS
+(2m16s): :app:testDebugUnitTest and :client:testDebugUnitTest EXECUTED fresh — new
+tests 52/52 PASSED (CloudServiceTests 36, ObservableObjectTests 8,
+AnswerServiceProbeTests 4, BackendExceptionTests 4); :app:assembleDebug built;
+checksums 13/13 OK. Run: https://github.com/SaEeDX4/interview-assistant-android/actions/runs/44553028816
+P4-C1 is CI-verified complete. Project test total: 582 green (:app 194, :client 32,
+:core 345, :contracts 11).
+
+## Package P4-C2 — MainViewModel + composition root
+
+The Live Assistant view model (the app-wide coordinator) ported member-by-member from
+the C#, plus the two platform-service seams it depends on and the Android composition
+root. No VM logic is stubbed: the only not-yet-real pieces are the two seam
+*implementations*, which are P5/P6 platform work by design (DC-91).
+
+### Per-file checklist (C# → Kotlin)
+
+- `ViewModels/MainViewModel.cs` (1,201) → `viewmodels/MainViewModel.kt` (1,676):
+  the complete mirror in C# member order — ctor wiring (update timer 1 min,
+  diagnostics timer 1 s with connection-gate polling, Cloud.Changed → account
+  label/banner/minutes/connectivity/workspace, Loc.LanguageChanged, capture
+  events), all 11 commands, the L* labels, AccountLabel by CloudState,
+  ServiceBanner, the static BillingLabel (bill_* keys), minutes label/tooltip,
+  fonts (AnswerFontSize auto-fit ?? preset, CoachFontSize ×1.18, MinAnswerFontSize,
+  CompactSpacing → BulletMargin/AnswerLineHeight, SetFitFontSize half-step clamp),
+  TextFlow RTL detection, Initialize, UseKnowledge, LoadSample, SetActive,
+  OpenWorkspaceForCurrentAccount (owner rules, deferred switch during a session,
+  legacy-selection migration, atomic publish), ClearUserState, SignOutAsync(quiet),
+  BuildEngine (refused during a session; cloud → CloudAnswerProvider + relay
+  OpenAiRealtimeTranscriber, dev → own-key providers; all engine listener lists
+  wired through Post), ApplyLiveSettings, audio (OnAudioFrame meter throttle,
+  capture-trouble toasts, RestartAudio), TranscriberOptions/ChatOptions,
+  TestTranscriptionAsync, TestAiAsync, ToggleListeningAsync (confirm hook → lease
+  flow), StopAsync (session + report), the lease family (BeginLease/StartLease
+  with the device_unknown re-register retry, PublishTranscriptionContext,
+  UseRelay, RelayCredentialAsync's restart wait, OnRelayRefusedAsync,
+  OnLeaseEndedAsync restart + lease_* notes, EndLease), SaveReport, SaveSession,
+  SubmitManualAsync, Variant, Navigate, OnAnswerStarted/ShowAnswer/SyncBullets/
+  Meta (meta_* keys), ApplyStatus (the full status table + the relay-forget rule),
+  RefreshDiagnostics (all lines, formats), RefreshFonts,
+  ForgetTranscriptionContextAsync, DismissLiveIntro, readiness
+  (ReadinessStore/context/state/InvalidateReadiness), DisposeAsync.
+  `BulletVm`, `FlowDirection` (System.Windows.FlowDirection) and `Thickness`
+  (System.Windows.Thickness) live in the same file.
+- `Services/AudioCaptureService.cs` (223) → `services/IAudioCaptureService.kt`
+  (105): the seam interface with the C# surface member-for-member, the
+  `PlaybackDevice` record, the pure `ToSourceFormat` mapping (input:
+  `WaveFormatInfo`, DC-92), the `PeakDb` helper and the StatusLabel computation.
+  Implementation → P5.
+- `Services/UpdateService.cs` (194) → `services/IUpdateService.kt` (40): the seam
+  interface (Status/StatusText/IsInstalled/UpdateReady/PendingVersion/Channel/
+  CanCheck/IsChecking/Changed/TickAsync/CheckNowAsync/ApplyOnExit/
+  TryApplyAndRestart). Implementation → P6.
+- `Views/ToastHost.cs` (`ToastKind`) → `ui/components/ToastKind.kt` (6): the enum
+  the VM's Notify event carries; the P4-D ToastHost consumes the same type.
+- (seams) `services/PlatformSeams.kt` (35): `INetworkAvailability` (DC-93) +
+  `ProcessStats`/`ProcessStatsProvider` (DC-94).
+- `App.xaml.cs` (48) → statics in `App.kt` (20) (`object App`:
+  requestedExitCode/selfTestOutput/fixtureDir) + startup in
+  `InterviewAssistantApplication.kt` (65): installLocTables (P2, kept),
+  AppPaths.install, the exception handler (DC-98), BuildInfo.install,
+  extractBundledKnowledge, Branding.load, the start log line, AppLog.prune,
+  then the composition root.
+- `Program.cs` (24) → `MainActivity.kt` (65): unchanged OAuth redirect wiring
+  (onCreate + onNewIntent) and the P1 skeleton screen; now also obtains the
+  composition root from the Application and the VM from the composition
+  (lazy; first touched by the Live UI in P4-G).
+- Composition root (new, no single C# file): `AppComposition.kt` (62) builds
+  settings → cloud → VM in the C# startup order; `platform/CompositionPlatform.kt`
+  (72) holds the Android implementations of the two small seams
+  (AndroidNetworkAvailability over ConnectivityManager, AndroidProcessStats over
+  Process/Debug/Runtime).
+
+### Divergences
+
+- DC-90 (constructor seams): the C# constructor builds Settings/Cloud/Updates
+  itself and captures the WPF Dispatcher. The port takes settings/cloud/updates/
+  capture as constructor parameters (built by AppComposition in the same order),
+  plus `postToUi` (the BeginInvoke counterpart), the timer `CoroutineScope`,
+  `INetworkAvailability`, `ProcessStatsProvider`, `workspaceFactory`/
+  `protectorFactory` (the C#'s `new Workspace(root, new DpapiProtector())`),
+  the `ConnectionToastGate` (the C# news it inline with a UtcNow clock) and a
+  `nowMillis` clock (the `Environment.TickCount64` counterpart for the meter
+  throttle). The two DispatcherTimers are coroutine delay loops on that scope;
+  their tick bodies (`onUpdateTick`/`onDiagTick`) are `internal` so tests drive
+  them without waiting. CancellationTokens are dropped throughout, as in every
+  earlier package (coroutine cancellation instead).
+- DC-91 (the two platform seams): IAudioCaptureService/IUpdateService are
+  interfaces mirroring the C# classes' public surfaces exactly — not stubs.
+  AppComposition supplies them through provider lambdas that throw a clear
+  IllegalStateException until the real implementations land (P5 capture, P6
+  updates), and builds the VM lazily, so nothing presents fake behaviour as
+  real and every other VM behaviour is fully working and tested now (with
+  fakes). The C#'s `#if UPDATE_TEST RunUpdateTestAsync` is a CI-only entry
+  point of the Windows updater test build, not app surface — not mirrored.
+- DC-92 (capture seam shape): `AudioCaptureService.ListDevices()` is static in
+  C#; on the seam it is an instance member (enumerating Android devices needs
+  the platform instance). `ToSourceFormat`'s NAudio `WaveFormat` input becomes
+  the platform-neutral `WaveFormatInfo` (its `isFloat` pre-combines the C#'s
+  two float tests: Encoding == IeeeFloat, or an extensible sub-format of
+  MEDIASUBTYPE_IEEE_FLOAT); the mapping and the `Unsupported bit depth {n}`
+  failure are ported exactly (NotSupportedException → UnsupportedOperationException,
+  the :core precedent). `StatusLabel` is computed by the shared
+  `captureStatusLabel` helper, exactly the C#'s formula.
+- DC-93 (network seam): `NetworkChange.NetworkAvailabilityChanged` →
+  `INetworkAvailability`; the production implementation
+  (AndroidNetworkAvailability, ConnectivityManager's default-network callback:
+  onAvailable → true, onLost → false) lives in the platform layer.
+- DC-94 (process-stats seam): RefreshDiagnostics' Process/GC reads →
+  `ProcessStatsProvider`; production AndroidProcessStats uses
+  Process.getElapsedCpuTime(), Debug.getPss() × 1024 (the working-set
+  counterpart), Runtime heap in use (the GC.GetTotalMemory counterpart) and
+  availableProcessors().
+- DC-95 (App statics): `object App` keeps the C# defaults; Android has no
+  --selftest/--fixture entry point yet, so selfTestOutput/fixtureDir stay null
+  (a self-test port would set them, together with the AppSettings.overridePath/
+  AppPaths.isolatedRoot isolation App.xaml.cs performs — deferred with it).
+- DC-96 (brush/flow/thickness): StatusBrush holds the "B.*" brush-key string
+  (the port's established brush convention, cf. ReadinessSnapshot.brushKey);
+  the C#'s initial Brushes.Gray maps to "B.TextDim" — the brush ApplyStatus's
+  Ready arm selects, applied by BuildEngine immediately. FlowDirection and
+  Thickness are small mirror types in the viewmodels package; BulletMargin
+  keeps WPF doubles (P4-D maps them to Dp).
+- DC-97 (raises + command construction): the C#'s setter side-effect raises
+  (Question → HasQuestionText/QuestionFlowDirection, IsListening/IsPaused →
+  StartPauseLabel, HistoryPosition → HistoryLabel, IsCoachView/IsProfileGap →
+  LAnswer, CompactSpacing → BulletMargin/AnswerLineHeight, Adaptive →
+  AdaptiveLabel) are implemented by one PropertyChanged listener registered in
+  init, because the bindable delegate (DC-84) cannot run setter side-effects;
+  the notifications fire on the same changes, in the same order. Raise names
+  are the camelCase Kotlin property names (the delegate's own names). Commands
+  are built in a final init block: RelayCommand evaluates its predicate once
+  at construction, and Kotlin initializers run in textual order (in C# the
+  constructor simply runs after all field initializers).
+- DC-98 (startup handlers): App.xaml.cs's three exception handlers → one
+  Thread default uncaught-exception handler that logs via AppLog and then
+  delegates to the previous handler (Android cannot "handle and continue"
+  like DispatcherUnhandledException; the platform crash behaviour is
+  unchanged). Program.cs's Velopack bootstrap has no counterpart until P6.
+- DC-99 (date/number formats): `_sessionStartedUtc` (DateTime, default =
+  unset) → OffsetDateTime? (null = default). SaveSession's DateTime.Now →
+  OffsetDateTime.now() (system zone). BillingLabel's `ToString("d", Loc.Culture)`
+  → DateTimeFormatter.ofLocalizedDate(SHORT) with Loc.locale over the
+  system-zone-converted value. Meta's `:0.00` and the diagnostics
+  `:0`/`:0.0`/`:0.000` formats go through LanguageRegistry.numberFormat
+  (Latin digits, DC-44) with fixed fraction digits and grouping off.
+  C# Math.Round → Math.rint (the :core precedent).
+
+### Test mapping (40 new @Test)
+
+Fixture: `viewmodels/MainViewModelFakes.kt` (fake capture/update/network/
+process-stats + the fixture bank: Q001/Q027 field-for-field from the shipped
+sample pack) and `viewmodels/MainViewModelFixture.kt` (a real CloudService over
+fake OkHttp transports — the P4-C1 pattern — plus the VM over the fakes, an
+immediate UI poster and the gate's fake clock).
+
+- `MainViewModelEngineTests` (15) — the SelfTest's VM checks against the real
+  :core engine: manual question → exactly 3 distinct prepared bullets;
+  spoken-style paraphrase → 3 bullets; history counter hidden without history
+  + Previous disabled; previous/next navigation + labels; rework acts on the
+  displayed item, adds no history entry; Coach toggle (3 keywords split by
+  '·' = XAB/REWARD/INCREMENTAL, structure contains '→', back to 3 bullets);
+  CanRework rules; unknown question → readable note, no "Exception"/" at ";
+  ApplyLiveSettings (sensitivity/fast-cache/answer-language reach the engine);
+  BuildEngine-when-idle replacement + history reset; SetFitFontSize clamping/
+  half-steps + CoachFontSize + CompactSpacing margins; TextFlow (Persian
+  question RTL, English LTR); DismissLiveIntro remembering; Meta with
+  diagnostics (style · source · mode · match 0.00-format); TestAiAsync cloud
+  path (answer + "cloud: gpt-5.4-mini" from the loaded config).
+- `MainViewModelAccountTests` (15) — BillingLabel table (all 8 states +
+  unknown → plan name; Canceling's period-end date in the Loc culture, and
+  the null-subscription empty slot); AccountLabel/ServiceBanner by state
+  (SignedIn + email/billing, TrialExhausted upgrade banner, SignedOut,
+  NotConfigured + its banner, ServiceUnavailable + offline banner,
+  UpdateRequired); minutes (period-only label/tooltip verbatim, today-below-
+  period, daily cap line, plain label without a plan figure); the SelfTest's
+  signed-out Start (note contains "Sign in", not listening) and the
+  not-configured Start; SignOut quiet vs normal toast.
+- `MainViewModelSessionTests` (10) — lease refusals (allowance_exhausted and
+  daily_live_cap notes are the lease_* copy verbatim; a generic refusal wraps
+  the description in lease_typed_still_work); device_unknown → re-register +
+  retry → listening; the full session (start toast, BuildEngine refused —
+  same engine instance, stop → idle, report viewer copy contains
+  "microphone was OFF" + the CSP meta, the stored session's ReportJson is
+  non-empty, ReportSaved fired with its id, and NO transcript file while
+  SaveSessionTranscript=false); pause ends listening with the paused toast;
+  connection gate (service outage → Lost after grace via the diag tick →
+  Restored; relay Reconnecting/Connected the same; a sub-grace blip toasts
+  nothing); the update tick carries sessionActive=false.
+
+Deferred BY NAME:
+- TestTranscriptionAsync end-to-end → P5 (needs the real capture source and a
+  live transcriber connection; the VM method itself is fully ported).
+- Update-service behaviour (tick/check/apply against a real updater) → P6
+  (the VM's tick wiring is covered through the seam fake).
+- The SelfTest's window-level checks (Quick-help overlay open/close, auto-fit
+  pixel measurements, ToastHost duplicate suppression) → P4-G with the views;
+  they are Compose/instrumented territory and CI has no emulator.
+- The SelfTest's production-service checks (forced-URL offline run) are
+  mirrored hermetically through fake transports instead of the live backend;
+  the P2 real-device/live-backend items remain scheduled for P4/P6 as before.
+
+### Compile risks (self-identified, for CI)
+
+1. `OpenAiRealtimeTranscriber`'s primary-constructor parameter order
+   (credentialProvider, options) is taken from the class header and the
+   secondary constructor's delegation; the VM calls it positionally, and via
+   the secondary (apiKeyProvider, options) overload with a method reference
+   (`SecretStore::getApiKey`).
+2. `CloudAnswerProvider` named arguments (sessionId/deviceId/purpose) from
+   its P2 header; `purpose = AnswerPurposes.Manual` (contracts object).
+3. `ReportBuilder.build` is called positionally in the C#'s argument order
+   (memory, kb, metrics, id, started, ended, language, pack, reconnects,
+   duplicatesSuppressed, profileLabel, targetLabel).
+4. `internal` tick bodies + `SecretStore.protector`'s internal setter are
+   read from the :app unit tests (friend module — the P4-B/C1 precedent).
+5. `delay(kotlin.time.Duration)` in TestTranscriptionAsync (coroutines 1.9).
+6. Behaviour (not compile) risks: the unknown-question note arrives through
+   the cloud provider's error path; TestAiAsync reads `engine.current` after
+   a failed answer request; the session tests start the real transcriber
+   against an unreachable relay (its documented contract: startAsync never
+   throws into callers) — the lease/stop assertions do not depend on it.
+7. MainActivity's `viewModel` lazy val is currently unused (warning only);
+   the Live UI consumes it in P4-G.
