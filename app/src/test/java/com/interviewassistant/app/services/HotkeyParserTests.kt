@@ -44,7 +44,7 @@ class HotkeyParserTests {
     @Test
     fun emptySegments_AreIgnored_AndTheLastKeyPartWins() {
         assertEquals(HotkeyParser.Combo(3, 0x4C), HotkeyParser.tryParse("Ctrl++Alt+L"))
-        assertEquals(HotkeyParser.Combo(3, 0x4C), HotkeyParser.tryParse("Ctrl+Alt+"))
+        assertEquals(HotkeyParser.Combo(3, 0x4C), HotkeyParser.tryParse("Ctrl+Alt+L+"))
         assertEquals(HotkeyParser.Combo(3, 0x51), HotkeyParser.tryParse("Ctrl+Alt+L+Q"))
     }
 
