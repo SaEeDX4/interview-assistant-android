@@ -12,6 +12,7 @@ import androidx.compose.ui.Modifier
 import com.interviewassistant.app.platform.OAuthRedirectBus
 import com.interviewassistant.app.ui.theme.IaTokens
 import com.interviewassistant.app.ui.theme.InterviewAssistantTheme
+import com.interviewassistant.app.viewmodels.MainViewModel
 
 /**
  * Mirror target of `InterviewAssistant.App/Program.cs` entry point (TRANSFER-MAP §2, layer: Platform).
@@ -19,8 +20,19 @@ import com.interviewassistant.app.ui.theme.InterviewAssistantTheme
  *
  * P2 slice: OAuth redirect intents (the §8 D5 substitute for the Windows loopback listener) are routed
  * to the waiting sign-in flow through [OAuthRedirectBus], on cold start and on re-delivery alike.
+ *
+ * P4-C2: the activity obtains the composition root (and, through it, the main view model) from the
+ * Application — the C#'s `new MainWindow()` reading the app-wide state. The view model itself is
+ * constructed lazily by the composition and first touched by the Live UI in P4-G.
  */
 class MainActivity : ComponentActivity() {
+
+    /** The composition root built by [InterviewAssistantApplication.onCreate]. */
+    val composition: AppComposition
+        get() = (application as InterviewAssistantApplication).composition
+
+    /** The main view model from the composition (lazy — see [AppComposition]). */
+    val viewModel: MainViewModel by lazy { composition.mainViewModel }
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         OAuthRedirectBus.deliver(intent)
