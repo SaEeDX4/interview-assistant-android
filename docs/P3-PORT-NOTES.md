@@ -983,3 +983,25 @@ All fixes are compile-level Kotlin/JVM adaptations; no behavior, literal, or tes
 - OpenAiAuthProbe hosts its own nested `Result` data class (the probe result), which shadows
   `kotlin.Result` inside the class; the bridge call now writes `kotlin.Result.failure(e)`
   explicitly. OpenAiChatAnswerProvider has no such shadowing type and compiled clean.
+
+## CI fix round 4 (2026-11-19, after Actions run #138 on 2aaa7bc — main compiled; 21 test-compile errors)
+
+Test-code-only adaptations; no production code and no test expectation changed.
+
+- **DC-53 — test-compile adaptations.** (a) MatcherEvaluationTests' `Case` table type is no
+  longer `private` (the public companion table exposes it). (b) L10nDateAndBidiTests uses
+  `Chronology.ofLocale` + the static `DateTimeFormatterBuilder.getLocalizedDateTimePattern`
+  (same corrections as DC-52). (c) LiveIntelligenceTests: `i * 60_000L` Long arithmetic where
+  C#'s int×long promotion was implicit. (d) Two test files imported LanguageDetector /
+  DuplicateGuard from the C# namespace's package guess — corrected to `languages` / `turn`
+  (same as DC-49). (e) Rc2EngineAcceptanceTests' GC-count helper reaches
+  `java.lang.management` reflectively — it is not on the Android unit-test compile classpath
+  but exists on the host JVM running the tests. (f) Rc5DataExportTests: the Fixtures target-factory call spelling aligned to
+  its definition (the company name is Teroxx, double-x).
+  (g) WorkspaceStoreTests passes `90.days` (kotlin.time.Duration, the main API's chosen
+  TimeSpan counterpart) instead of java.time.Duration. (h) ProviderTests: StubInterceptor now
+  takes `(Request) -> Response` exactly like the C#'s `Func<HttpRequestMessage,
+  HttpResponseMessage>` StubHandler (the body is still recorded separately as lastBody);
+  the SSE literal uses `JsonPrimitive(d).toString()` (its JSON representation, what the C#'s
+  JsonSerializer.Serialize produced); `Okio.buffer(source)` replaced by the `source.buffer()`
+  extension (the static form is removed in Okio 3).
