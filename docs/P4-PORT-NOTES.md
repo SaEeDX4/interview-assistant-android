@@ -1619,3 +1619,18 @@ emulator) — none were written; the controller's render mapping is what the JVM
   card's Refresh button) and E7F8 (the device rows' monitor), which the P4-D glyph set did not
   include. Added to IaGlyph as Refresh/Devices with hand-authored vector drawables in the set's
   Material-style path language; no existing glyph changed.
+
+### P4-F CI fix round 1 (DC-157)
+
+Run #270 on head cdbd964 failed at :app:compileDebugKotlin, three call-site
+defects in the new package (the DC-100/DC-120/DC-135 family):
+(1) AccountPage called FocusRegistry.rememberRequester — an extension
+function in ui.home (P4-E) — without importing it; import added.
+(2) PreInterviewPage uses BringIntoViewRequester/bringIntoView
+(ExperimentalFoundationApi) without @OptIn; annotation + import added.
+(3) PreInterviewPageControllerImpl constructed OpenAiRealtimeTranscriber
+with a positional lambda, ambiguous between its two constructors (which
+also made every member access report unresolved); now the named-argument
+form MainViewModel uses (apiKeyProvider = SecretStore::getApiKey). The
+class's real surface (statusChangedListeners, startAsync, status,
+activeModel, disposeAsync) matches MainViewModel's verified usage.
