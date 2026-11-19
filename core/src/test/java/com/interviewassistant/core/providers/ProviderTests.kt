@@ -267,7 +267,7 @@ class ProviderTests {
 
     @Test
     fun transcriberFallsBackToNextModelWhenRejected() {
-        val t = OpenAiRealtimeTranscriber({ "k" })
+        val t = OpenAiRealtimeTranscriber(apiKeyProvider = { "k" })
         assertEquals("gpt-4o-transcribe", t.activeModel)
         t.handleEvent(
             "{\"type\":\"error\",\"error\":{\"code\":\"model_not_found\",\"message\":\"unknown model\"}}".toByteArray(Charsets.UTF_8),
@@ -280,11 +280,11 @@ class ProviderTests {
     @Test
     fun realtimeSessionUpdateMatchesDocumentedShape() {
         val t = OpenAiRealtimeTranscriber(
-            { "k" },
-            RealtimeTranscriberOptions().apply { prompt = Fixtures.testKnowledge().context.buildTranscriptionPrompt() },
+            apiKeyProvider = { "k" },
+            options = RealtimeTranscriberOptions().apply { prompt = Fixtures.testKnowledge().context.buildTranscriptionPrompt() },
         )
         val ga = Json.parseToJsonElement(t.buildSessionUpdate()).jsonObject
-        assertFalse(OpenAiRealtimeTranscriber({ "k" }).buildSessionUpdate().contains("Teroxx")) // generic default
+        assertFalse(OpenAiRealtimeTranscriber(apiKeyProvider = { "k" }).buildSessionUpdate().contains("Teroxx")) // generic default
         val session = ga["session"]!!.jsonObject
         val input = session["audio"]!!.jsonObject["input"]!!.jsonObject
         assertNull(input["transcription"]!!.jsonObject["language"]) // auto-detect by default
@@ -296,7 +296,7 @@ class ProviderTests {
         assertTrue(input["transcription"]!!.jsonObject["prompt"]!!.jsonPrimitive.content.contains("Teroxx"))
 
         val beta = Json.parseToJsonElement(
-            OpenAiRealtimeTranscriber({ "k" }, RealtimeTranscriberOptions().apply { protocol = "beta" }).buildSessionUpdate(),
+            OpenAiRealtimeTranscriber(apiKeyProvider = { "k" }, options = RealtimeTranscriberOptions().apply { protocol = "beta" }).buildSessionUpdate(),
         ).jsonObject
         assertEquals("transcription_session.update", beta["type"]!!.jsonPrimitive.content)
         assertEquals("pcm16", beta["session"]!!.jsonObject["input_audio_format"]!!.jsonPrimitive.content)
@@ -304,7 +304,7 @@ class ProviderTests {
 
     @Test
     fun realtimeEventsAreDispatched() {
-        val t = OpenAiRealtimeTranscriber({ "k" })
+        val t = OpenAiRealtimeTranscriber(apiKeyProvider = { "k" })
         val log = mutableListOf<String>()
         t.speechStartedListeners.add { log.add("start") }
         t.speechStoppedListeners.add { log.add("stop") }
