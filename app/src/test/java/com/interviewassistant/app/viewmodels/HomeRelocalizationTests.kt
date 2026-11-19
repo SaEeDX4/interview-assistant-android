@@ -77,8 +77,8 @@ class HomeRelocalizationTests {
         Loc.language = "de"
 
         // The pickers were rebuilt (auto/same first, then every language) and the selections kept.
-        assertEquals("auto", f.home.interviewLanguageItems.first().value)
-        assertEquals("same", f.home.answerLanguageItems.first().value)
+        assertEquals("auto", f.home.interviewLanguageItems.first().code)
+        assertEquals("same", f.home.answerLanguageItems.first().code)
         assertEquals(LanguageRegistry.all.size + 1, f.home.interviewLanguageItems.size)
         assertEquals("fa", f.home.targetLanguageCode)
         assertEquals("fa", f.home.targetAnswerLanguageCode)
