@@ -47,6 +47,17 @@ import org.junit.Test
  * theories run as case loops inside one test; `App.UiState.PasswordResetCopy` is asserted through its
  * source string, `Loc.t("acct_reset_requested")`.
  */
+/** Minimal GET for the loopback tests (java.net.http does not exist on the Android classpath). */
+private fun httpGet(url: String): Pair<Int, String?> {
+    val conn = java.net.URI(url).toURL().openConnection() as java.net.HttpURLConnection
+    conn.instanceFollowRedirects = false
+    return try {
+        conn.responseCode to conn.getHeaderField("Cache-Control")
+    } finally {
+        conn.disconnect()
+    }
+}
+
 class CloudAuthTests {
 
     // ---- test doubles (the C# file's nested Stub / MemoryStore / ManualTime / XorProtector) ----
@@ -341,19 +352,12 @@ class CloudAuthTests {
         try {
             assertTrue(loop.redirectUri.startsWith("http://127.0.0.1:"))
             val wait = async { loop.waitForCode(20.seconds) }
-            val httpClient = java.net.http.HttpClient.newHttpClient()
-            val wrong = httpClient.send(
-                java.net.http.HttpRequest.newBuilder(java.net.URI("http://127.0.0.1:${loop.port}/callback?s=forged&code=EVIL")).build(),
-                java.net.http.HttpResponse.BodyHandlers.ofString(),
-            )
-            assertEquals(404, wrong.statusCode())
+            val (wrongCode, _) = httpGet("http://127.0.0.1:${loop.port}/callback?s=forged&code=EVIL")
+            assertEquals(404, wrongCode)
             assertFalse(wait.isCompleted)
-            val ok = httpClient.send(
-                java.net.http.HttpRequest.newBuilder(java.net.URI(loop.redirectUri + "&code=GOOD")).build(),
-                java.net.http.HttpResponse.BodyHandlers.ofString(),
-            )
-            assertEquals(200, ok.statusCode())
-            assertEquals("no-store", ok.headers().firstValue("Cache-Control").orElse(null))
+            val (okCode, okCacheControl) = httpGet(loop.redirectUri + "&code=GOOD")
+            assertEquals(200, okCode)
+            assertEquals("no-store", okCacheControl)
             assertEquals("GOOD", wait.await())
         } finally {
             loop.close()
@@ -379,13 +383,8 @@ class CloudAuthTests {
                 tcp.getOutputStream().flush()
             }
             assertFalse(wait.isCompleted)
-            val httpClient = java.net.http.HttpClient.newHttpClient()
-            val errResponse = httpClient.send(
-                java.net.http.HttpRequest.newBuilder(java.net.URI(loop.redirectUri + "&error=access_denied&error_description=User%20cancelled")).build(),
-                java.net.http.HttpResponse.BodyHandlers.ofString(),
-            )
-            assertEquals(400, errResponse.statusCode())
-            try {
+            val (errCode, _) = httpGet(loop.redirectUri + "&error=access_denied&error_description=User%20cancelled")
+            assertEquals(400, errCode)
                 wait.await()
                 fail("expected AuthException")
             } catch (e: AuthException) {
@@ -432,12 +431,8 @@ class CloudAuthTests {
                 i++
             }
             assertTrue(otpBody!!.contains("\"code_challenge_method\":\"s256\""))
-            val httpClient = java.net.http.HttpClient.newHttpClient()
-            val resp = httpClient.send(
-                java.net.http.HttpRequest.newBuilder(java.net.URI(redirect!! + "&code=MAGIC")).build(),
-                java.net.http.HttpResponse.BodyHandlers.ofString(),
-            )
-            assertEquals(200, resp.statusCode()) // the user clicking the e-mail link
+            val (respCode, _) = httpGet(redirect!! + "&code=MAGIC")
+            assertEquals(200, respCode) // the user clicking the e-mail link
             val session = signIn.await()
             assertEquals("at", session.accessToken)
             assertTrue(fake.calls.last().second.contains("\"auth_code\":\"MAGIC\""))
@@ -598,12 +593,8 @@ class CloudAuthTests {
                 i++
             }
             assertTrue(recoverBody!!.contains("code_challenge"))
-            val httpClient = java.net.http.HttpClient.newHttpClient()
-            val resp = httpClient.send(
-                java.net.http.HttpRequest.newBuilder(java.net.URI(redirect!! + "&code=RESET")).build(),
-                java.net.http.HttpResponse.BodyHandlers.ofString(),
-            )
-            assertEquals(200, resp.statusCode())
+            val (respCode, _) = httpGet(redirect!! + "&code=RESET")
+            assertEquals(200, respCode)
             recover.await()
             auth.updatePasswordAsync("NewSecret123")
             assertEquals("Bearer at", putAuth)
