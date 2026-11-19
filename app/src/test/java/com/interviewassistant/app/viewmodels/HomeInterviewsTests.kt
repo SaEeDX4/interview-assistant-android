@@ -160,15 +160,19 @@ class HomeInterviewsTests {
         stored.jobDescriptionText = "Senior Engineer. Build distributed systems in Kotlin."
         f.store().saveTarget(stored)
         f.home.navigateAsync(HomeRoute("interviews"))
-        val readinessBefore = f.vm.readiness.snapshot
+        val readinessContextBefore = f.vm.readinessContext
         f.home.prepareAsync()
         val saved = f.store().getTarget(tg.id)!!
         assertEquals(PreparationState.Prepared, saved.preparation)
         assertNotNull(f.store().getPack(tg.id))
         assertEquals(Loc.t("state_prepared"), f.home.prepStatusText)
         assertTrue(f.toasts.any { it.first == Loc.t("toast_prep_complete") })
-        // The readiness snapshot was invalidated/touched by the completed preparation.
-        assertTrue(f.vm.readiness.snapshot !== readinessBefore || f.vm.readinessState != com.interviewassistant.app.uistate.ReadinessState.NotChecked)
+        // The completed preparation invalidated readiness: the revision bumped, so the
+        // readiness context (owner + target + device + revision) no longer matches —
+        // the observable effect of InvalidateReadiness (Touch republishes the same
+        // snapshot instance, exactly as in C#; with no checks run, the state stays
+        // NotChecked, so the context is the faithful signal).
+        assertTrue(f.vm.readinessContext != readinessContextBefore)
     }
 
     @Test
