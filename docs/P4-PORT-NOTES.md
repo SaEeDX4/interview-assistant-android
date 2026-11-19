@@ -1791,3 +1791,45 @@ returns false — the parser is faithful; the test string was missing its
 "L" (the test's own intent, per its name and sibling assertions, is a
 trailing empty segment after a complete combo). Test input corrected
 to "Ctrl+Alt+L+"; no production code changed.
+
+### P4-G CI VERIFICATION — COMPLETE (2026-11-19)
+
+GitHub Actions run #293 on head e2e3359 — SUCCESS (1m47s):
+:app:testDebugUnitTest EXECUTED fresh — 514/514 PASSED (counted from
+per-test log lines); assembleDebug built; checksums 13/13 OK; other
+modules FROM-CACHE on identical inputs. Project total: 902 tests
+verified green (:app 514, :core 345, :client 32, :contracts 11).
+Fix rounds on the way: DC-166 (three call-site defects), DC-167
+(hotkey test expectations mis-derived vs the C# MOD_* values — parser
+faithful), DC-168 (hotkey test input missing its key part — parser
+faithful). P4-G (Settings page + controller, Live screen chrome,
+DC-158…DC-168) is CI-verified complete. The P1 SettingsScreen
+placeholder was deleted from the repo in this package (commit 57b92c7).
+
+## P4 CI VERIFICATION — COMPLETE (2026-11-19)
+
+All seven P4 packages are CI-verified: P4-A UiState (run #186),
+P4-B platform services (#189), P4-C1 CloudService facade (#198),
+P4-C2 MainViewModel (#210), P4-C3 HomeViewModel (#234), P4-D theme +
+components + hosts (#246), P4-E Home shell + Start/Profiles/
+Interviews/Reports (#258), P4-F Account + Help + PreInterview (#273),
+P4-G Settings + Live chrome (#293). Final :app state: every §3.2
+surface exists as real Compose wired to the mirrored view models;
+zero TODO/NotImplemented/placeholder in :app main sources (parent
+sweep 2026-11-19); the P1 skeleton screens are all deleted from the
+repo. Divergences DC-60…DC-168.
+
+P4 exit-gate honesty note (per TRANSFER-MAP §7): the CI-verifiable
+subset of the gate is met — UiState parity tests pass, navigation
+guard / dirty-state / relocalization behaviors (incl. the fa RTL
+draft-preservation case) are verified by JVM tests, §3.1 tokens are
+asserted by ThemeTokensTest, §3.3 breakpoints by LiveChrome/HomeLayout
+tests. What CI cannot cover: Compose UI (androidTest) assertions —
+GitHub Actions here has no emulator — and real-device behavior. Still
+open and NOT closed by P4: P2's real-device sign-in/device
+registration against the live backend and the Backend.Tests re-run
+(scheduled P6 device testing); real audio capture (P5); the real
+update service (P6). Production startup still constructs the
+capture/update providers lazily and throws rather than faking
+(DC-91), so the app is not yet runnable end-to-end on a device —
+that is exactly what P5/P6 close.
