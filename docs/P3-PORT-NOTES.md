@@ -977,3 +977,9 @@ All fixes are compile-level Kotlin/JVM adaptations; no behavior, literal, or tes
   call sites now use the `Continuation.resumeWith` member with `Result.failure(e)` — the same
   exception delivery to the suspended caller; the `isActive` guard is unchanged. The other half
   of DC-50 (`resume(value, null)`) compiled clean in run #134 and stands.
+
+## CI fix round 3 (2026-11-19, after Actions run #136 on 588550b — 1 error)
+
+- OpenAiAuthProbe hosts its own nested `Result` data class (the probe result), which shadows
+  `kotlin.Result` inside the class; the bridge call now writes `kotlin.Result.failure(e)`
+  explicitly. OpenAiChatAnswerProvider has no such shadowing type and compiled clean.
