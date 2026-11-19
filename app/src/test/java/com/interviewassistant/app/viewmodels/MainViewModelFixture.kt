@@ -235,7 +235,7 @@ class VmFixture(val cloud: VmCloudFixture) {
 
     /** The connection gate's clock; tests advance it explicitly. */
     var gateNow: OffsetDateTime = OffsetDateTime.of(2026, 1, 1, 0, 0, 0, 0, ZoneOffset.UTC)
-    val gate = ConnectionToastGate { gateNow }
+    val gate = ConnectionToastGate({ gateNow })
 
     val toasts = mutableListOf<Triple<String, ToastKind, String?>>()
     val reportSaved = mutableListOf<String>()
