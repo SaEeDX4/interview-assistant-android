@@ -1779,3 +1779,15 @@ expectations — Ctrl alone = 2, Win+Shift+Alt = 0x1|0x4|0x8 — agree with
 the parser and passed). The test expectations were corrected 6 → 3;
 no production code and no C#-derived behavior changed (the DC-122
 precedent: a test premise wrong against the C# is a test defect).
+
+### P4-G CI fix round 3 (DC-168)
+
+Run #291 on head 2c4c21f: 514 tests, 1 FAILED —
+emptySegments_AreIgnored_AndTheLastKeyPartWins expected Combo(3, 0x4C)
+for the input "Ctrl+Alt+" but the parser returned null. Proven against
+the C# again: that input has NO key part (Ctrl, Alt, and a trailing
+empty segment), so HotkeyService.TryParse leaves key = Key.None and
+returns false — the parser is faithful; the test string was missing its
+"L" (the test's own intent, per its name and sibling assertions, is a
+trailing empty segment after a complete combo). Test input corrected
+to "Ctrl+Alt+L+"; no production code changed.
