@@ -37,6 +37,10 @@ android {
 dependencies {
     implementation(project(":core"))
     implementation(project(":client"))
+    // kotlinx.serialization on :app's compile classpath too: ErrorCopy matches
+    // SerializationException directly (P4-PORT-NOTES DC-64, parent-resolved), and the
+    // settings model (P4-B) serializes settings.json with it.
+    implementation(libs.kotlinx.serialization.json)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
