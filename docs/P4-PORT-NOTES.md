@@ -1415,3 +1415,14 @@ Run #242 on head 3681b57 failed at :app:compileDebugKotlin: Scrollbar.kt used
 the DC-100/DC-120 call-site defect family. A sweep of every new UI file for
 .dp/.sp usage without the matching import found Scrollbar.kt as the only
 instance. Import added; nothing else changed.
+
+### P4-D CI fix round 2 (DC-135, continued)
+
+Run #244 on head ff0e0fd: compiled and assembled; 407 tests completed, 405
+passed, 2 initializationError — DialogControllerTest and
+Rc5ComponentAccessibilityTests each had ONE @Test written as
+`fun x() = runBlocking { ... }` whose block's last expression (a dialog-result
+await) made the method non-void, which JUnit4 rejects for the whole class
+(18 tests were masked). Both methods converted to block bodies; bodies and
+assertions unchanged. A sweep of the other UI tests found no other
+expression-bodied tests outside the runBlocking pattern.
