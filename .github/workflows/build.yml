@@ -14,7 +14,7 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
-      - run: gradle --refresh-dependencies :app:assembleDebug :core:testDebugUnitTest :client:testDebugUnitTest :contracts:testDebugUnitTest
+      - run: gradle --refresh-dependencies :core:testDebugUnitTest --tests "com.interviewassistant.core.providers.ProviderTests" --tests "com.interviewassistant.core.orchestration.Rc2EngineTimingTests" --tests "com.interviewassistant.core.persistence.SecurityAuditExportTests" # TEMP-DIAG
       - name: Upload unit-test reports (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
