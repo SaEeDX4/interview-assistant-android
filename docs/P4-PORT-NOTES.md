@@ -1407,3 +1407,11 @@ assertions would be unverifiable claims; the JVM tests pin every rule that has l
 - Rc5DesignSystemTests.cs: the XAML-scan rules (inputs inside FormField, token-only sizes) have no Android
   source to scan; their substance is the component defaults asserted in ThemeTokensTest. Page-level
   adherence is reviewed per page in P4-E/F/G.
+
+### P4-D CI fix round 1 (DC-135)
+
+Run #242 on head 3681b57 failed at :app:compileDebugKotlin: Scrollbar.kt used
+6.dp/3.dp inside a DrawScope without importing androidx.compose.ui.unit.dp —
+the DC-100/DC-120 call-site defect family. A sweep of every new UI file for
+.dp/.sp usage without the matching import found Scrollbar.kt as the only
+instance. Import added; nothing else changed.
