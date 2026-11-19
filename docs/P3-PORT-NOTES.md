@@ -1041,3 +1041,16 @@ Rc2EngineAcceptanceTests.pauseResumeTwice_OneContinuousSession_SevenOfSeven.
   starved forever and the loop never exits. Fix: `{ s.run(20); yield() }` — the yield hands
   the dispatcher to the queued answer coroutine, reproducing the C# interleaving. No
   expectation, timing, or production code changed.
+
+## CI infrastructure note (2026-11-19, runs #155 attempts 1–2)
+
+Not a port divergence: two consecutive full-suite runs failed at `:app:compileDebugKotlin`
+before any test ran — Gradle could not fetch
+`org.jetbrains.kotlin:kotlin-compose-compiler-plugin-embeddable:2.0.21` from
+repo.maven.apache.org ("Could not find", searched only that host). The artifact exists on
+Maven Central (verified via mvnrepository: the plugin family lists 2.0.21 in Central), and
+the same build downloaded it fine hours earlier (run #144), so this is a repository-host
+failure, not a project error. Remedy: settings.gradle.kts now lists Google's official
+Maven Central mirror (maven-central.storage-download.googleapis.com/maven2) as a fallback
+repository after mavenCentral(); content is identical, resolution order unchanged when the
+primary host is healthy.
