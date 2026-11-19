@@ -1169,3 +1169,13 @@ parameter (busyText) instead of action — the DC-100 trap inside the new code; 
 now pass action = { … }. (4) The export Json builder used `indent`, which is not a
 kotlinx JsonBuilder property; corrected to prettyPrintIndent. No behavior or
 expectation changed.
+
+### P4-C3 CI fix round 2 (DC-120, continued)
+
+Run #216 on head 77ae3ec: one clash remained — HomeViewModel declares both
+`var profileTab by bindable(...)` (JVM setter setProfileTab(String)) and the C#
+helper `fun setProfileTab(tab)`; renamed the helper selectProfileTab (4 internal
+call sites; the property and its notifications are unchanged; C# keeps both because
+C# properties and methods do not share a JVM-style signature). A file-level sweep
+for the same pattern flagged HomeRows' HomeClipboard.setText — a false positive
+(interface method, different type from InlineMessageState.text).
