@@ -76,6 +76,8 @@ import com.interviewassistant.app.ui.components.iaButtonFocusRing
 import com.interviewassistant.app.ui.help.HelpPage
 import com.interviewassistant.app.ui.preinterview.PreInterviewPage
 import com.interviewassistant.app.ui.preinterview.PreInterviewPageControllerImpl
+import com.interviewassistant.app.ui.settings.SettingsPage
+import com.interviewassistant.app.ui.settings.SettingsPageControllerImpl
 import com.interviewassistant.app.ui.theme.IaTextStyles
 import com.interviewassistant.app.ui.theme.IaTokens
 import com.interviewassistant.app.ui.theme.LocalIaColors
@@ -94,7 +96,8 @@ import com.interviewassistant.core.languages.Loc
  * Layout follows §3.3: a navigation rail on expanded widths (the C# sidebar's form), a bottom
  * navigation bar on compact widths (DC-149); the page margin is 8/0/16/8 and the content is at
  * most 1120 wide. The Account / PreInterview / Help page bodies plug into the page dispatch
- * (P4-F, DC-136); the Settings body follows in P4-G. The shell chrome — footers included — is here.
+ * (P4-F, DC-136); the Settings body plugs in with its controller in P4-G. The shell chrome —
+ * footers included — is here.
  */
 @Composable
 fun HomeScreen(
@@ -103,6 +106,7 @@ fun HomeScreen(
     toasts: ToastController,
     focusRegistry: FocusRegistry,
     preInterview: PreInterviewPageControllerImpl,
+    settings: SettingsPageControllerImpl,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalIaColors.current
@@ -125,10 +129,10 @@ fun HomeScreen(
                         when (HomeLayout.navForm(maxWidth.value)) {
                             NavForm.Rail -> Row(Modifier.fillMaxSize()) {
                                 NavRail(home, page)
-                                ContentColumn(home, page, focusRegistry, preInterview, Modifier.weight(1f))
+                                ContentColumn(home, page, focusRegistry, preInterview, settings, Modifier.weight(1f))
                             }
                             NavForm.Bottom -> Column(Modifier.fillMaxSize()) {
-                                ContentColumn(home, page, focusRegistry, preInterview, Modifier.weight(1f))
+                                ContentColumn(home, page, focusRegistry, preInterview, settings, Modifier.weight(1f))
                                 LanguageStrip(home)
                                 BottomNav(home, page)
                             }
@@ -568,6 +572,7 @@ private fun ContentColumn(
     page: String,
     focusRegistry: FocusRegistry,
     preInterview: PreInterviewPageControllerImpl,
+    settings: SettingsPageControllerImpl,
     modifier: Modifier = Modifier,
 ) {
     val scrollState = rememberScrollState()
@@ -599,8 +604,7 @@ private fun ContentColumn(
                         "preinterview" -> PreInterviewPage(home, preInterview)
                         "account" -> AccountPage(home, focusRegistry)
                         "help" -> HelpPage(home)
-                        // "settings" plugs in here in P4-G (DC-136); until then the route
-                        // renders the shell chrome with an empty content region.
+                        "settings" -> SettingsPage(settings)
                         else -> Unit
                     }
                 }
