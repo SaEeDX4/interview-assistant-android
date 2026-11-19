@@ -294,3 +294,212 @@ HomeRoute page list + signed-out gate rule exact.
   needs the same dependency for settings.json). No other dependency change.
 - CI note: the workflow's Gradle command gains `:app:testDebugUnitTest` from this package
   onward (P4-A push), so the UiState parity tests execute in CI.
+
+### P4-A CI VERIFICATION (2026-11-19)
+
+Pushed in 6 commits (head d5563ae, 188 commits). GitHub Actions run #186 SUCCESS
+(1m41s): :app:testDebugUnitTest EXECUTED fresh — all 103 UiState parity tests PASSED
+(8 classes: ErrorStateTests, Rc5AccountTests, Rc5LiveWindowTests, Rc5ReadinessTests,
+Rc5ReadinessPageTests, Rc5SettingsTests, UiFoundationTests, UiPagesTests);
+:app:assembleDebug built; :core/:client/:contracts FROM-CACHE (inputs unchanged);
+parity checksums 13/13 OK. Run: https://github.com/SaEeDX4/interview-assistant-android/actions/runs/44544811179
+P4-A is CI-verified complete. First-attempt green — no fix round was needed.
+
+## Package P4-B — App platform services
+
+The app-level services the UI and view models consume, ported from
+`InterviewAssistant.App/Services/`: AppSettings, AppLog, AppPaths, Branding,
+BuildFlavor, BuildInfo, SecretStore, Workspace. All in
+`project/app/src/main/java/com/interviewassistant/app/services/`
+(package `com.interviewassistant.app.services`, confirmed from the P1 skeleton);
+the skeleton `Services.kt` now carries only the package doc comment.
+Tests in `project/app/src/test/java/com/interviewassistant/app/services/` —
+43 @Test methods in 6 files. Nothing in this package has been compiled or run;
+GitHub Actions is the first execution check.
+
+### Per-file checklist (C# → Kotlin)
+
+| C# file | Lines | Kotlin file | Lines | Notes |
+|---|---|---|---|---|
+| AppPaths.cs | 13 | AppPaths.kt | 76 | Special folders → installed base-dir seam (DC-75); adds `install(context)`/`installBaseDirs(...)` and `baseDirectory`. |
+| AppLog.cs | 64 | AppLog.kt | 99 | Ring 400, daily file, redaction regex byte-identical, `Written` event → listener list (P3 convention). |
+| AppSettings.cs | 127 | AppSettings.kt | 267 | All 49 properties in C# order/defaults; migrations; atomic save; file format per DC-76 (extra lines are the STJ-spelling renderer + serializers). |
+| Branding.cs | 28 | Branding.kt | 43 | Defaults + branding.json override; catch filter SerializationException \| IOException (DC-82). |
+| BuildFlavor.cs | 14 | BuildFlavor.kt | 15 | `const val Developer = false` (DC-78). |
+| BuildInfo.cs | 43 | BuildInfo.kt | 72 | Pure derivation unchanged; version source + IsInstalled per DC-77. |
+| SecretStore.cs | 65 | SecretStore.kt | 106 | DPAPI → Keystore protector seam (DC-79); Mask/SelfTestRoundTrip semantics exact. |
+| Workspace.cs | 98 | Workspace.kt | 176 | Composition over :core WorkspaceStore/PreparationAssets; `DpapiProtector` not duplicated (counterpart is platform `KeystoreDataProtector`, P2); adds `extractBundledKnowledge` platform glue (DC-80). |
+| (skeleton) Services.cs — none | — | Services.kt | 16 | Package doc only; the placeholder object is gone. |
+
+### Test mapping (Windows → Android)
+
+- `Services/SelfTest.cs` "Settings persistence" (AnswerModel + WindowOpacity via
+  OverridePath) → `AppSettingsTests.settingsPersistence_SelfTestCheck`, same values;
+  extended to a full 49-property save/load round-trip (`saveLoad_RoundTripsEveryProperty`,
+  the C# `Customized()` recipe executed against the real model).
+- `Services/SelfTest.cs` "DPAPI credential protection round-trip"
+  (`SecretStore.SelfTestRoundTrip()`, "protect/unprotect ok, wrong entropy rejected") →
+  `SecretStoreTests.selfTestRoundTrip_ProtectUnprotectOk_WrongEntropyRejected` over a fake
+  keyed protector, plus mask/file/clear/corrupt cases.
+- `Services/SelfTest.cs` "Build information: version, channel and commit" →
+  `BuildInfoTests.buildInformation_SelfTestCheck` (same assertions) + a 10-case
+  derivation table (rc/beta/alpha/pre-release/stable, short/empty/long metadata, "local").
+- `Rc5SettingsTests.cs` classification invariant → executed against the REAL AppSettings
+  (`AppSettingsTests.everyAppSetting_IsClassifiedExactlyOnce_AgainstTheRealModel`): the
+  C# test reads the 49 property names from AppSettings.cs source and compares with a
+  FakeSettings mirror; here reflection over the real class is compared with the same 49
+  names pinned in the test and with the three SettingsDefaults buckets.
+  `ResetSection_ResetsExactlyItsFields` / `RestoreAll_...` → the same checks against the
+  real model for all 7 categories (`reset_WithTheRealSettings_...`,
+  `restoreAll_WithTheRealSettings_...`). (P4-A already ports these against FakeSettings;
+  P4-B re-runs them against the real class, as the brief required.)
+- AppSettings defaults (audit §3.1 table) → `defaults_MatchTheWindowsModel` (all 49) and
+  `fontSizes_FollowThePreset` (16/14, 19/16, 22/17, 26/19).
+- Migrations (AppSettings.cs Load) → 4 cases: v1 both legs, v1 user-changed models kept,
+  v2 transcription-only (answer model NOT migrated — the v1 leg does not run), and a file
+  without SettingsVersion (STJ leaves the default 3 → no leg runs).
+- File format → `fileFormat_MatchesTheWindowsSpellings` (enum ordinal 2, "720" not
+  "720.0", nulls written, declaration order, derived echoes last) and
+  `fileFormat_GuidIsTheLowercaseHyphenatedForm`.
+- AppLog (no dedicated Windows unit test; behavior from AppLog.cs) → 8 tests: sanitize,
+  redaction (sk- + 6 kept), line format + daily file, Describe type-only rule, Error
+  composition, 400-line ring, Written listeners, Prune (20-day file deleted, 14-day
+  boundary kept, non-date names kept).
+- Branding → defaults → override (absent keys kept) → bad JSON ignored → non-string
+  value refuses the file.
+- Workspace → fallback (`no_interview_prepared` label, empty KB), LoadActive refresh
+  (stale pack personal/boundaries replaced by the profile's current confirmed entries;
+  unconfirmed/rejected facts excluded; preferred-name label; wrong profile/target →
+  fallback), viewer copies write/delete/clear under `view/<owner>`, LoadSample
+  (null/missing-bank/fixture with context label).
+
+SelfTest checks covered by this package's tests: "Settings persistence",
+"DPAPI credential protection round-trip", "Build information: version, channel and
+commit", and the settings half of "Profile → confirm facts → prepare → load (isolated
+DPAPI workspace)" (the Workspace composition + LoadActive shape; the full
+prepare-pipeline half is :core's, ported in P3). The "Shipped cloud.json: public API
+endpoint only, no secrets" check targets the :app asset installed in P2, not a service
+in this package.
+
+### Divergences
+
+- **DC-75** AppPaths: `Environment.GetFolderPath` (ApplicationData / LocalApplicationData
+  / MyDocuments) → base folders installed once by the composition root
+  (`install(context)`: roaming/local base = app-private files dir, documents base =
+  app-specific Documents dir; `installBaseDirs` is the Context-free form tests use).
+  Before install, bases fall back to a temp-dir app folder so early logging never crashes.
+  `IsolatedRoot` semantics unchanged (Roaming/Local/Sessions redirected, Logs never).
+  Adds `baseDirectory` = the non-isolated local folder, the `AppContext.BaseDirectory`
+  counterpart where bundled assets are extracted (see DC-80).
+- **DC-76** AppSettings file format (kotlinx.serialization instead of System.Text.Json,
+  same options shape: indented, defaults + nulls written, unknown keys ignored):
+  `FontPreset` is written as its ordinal number — the C#'s plain options register no
+  string-enum converter, so the number is the wire form on both platforms (contrast
+  :core models, whose C# types carry JsonStringEnumConverter and travel as names);
+  `CloudDeviceId` as the lowercase hyphenated UUID string (= Guid "D" form);
+  integral doubles are rendered in STJ's spelling ("720", not kotlinx's "720.0") by a
+  token-aware post-pass that never touches string literals, and the two get-only derived
+  properties STJ writes (AnswerFontSize, QuestionFontSize, declared last) are appended
+  by the same renderer — a Windows-written file loads identically on Android and vice
+  versa. Residuals: string escaping follows kotlinx (STJ's default encoder additionally
+  \uXXXX-escapes non-ASCII and HTML-sensitive characters; every settings value is ASCII
+  by construction — model ids, hotkey chords, language codes, ids); the line separator
+  is "\n" (kotlinx) where STJ-on-Windows writes "\r\n" — parse-compatible both ways;
+  an out-of-range FontPreset ordinal reads as ExtraLarge (STJ accepts any int; the
+  derived-size switches fall back to the same arm) instead of refusing the file.
+- **DC-77** BuildInfo: the informational-version source is the installed package's
+  version name (PackageManager), installed by `install(context)`; the derivation
+  (Version/Commit/Channel/Summary/ChannelLabel) is the C#'s, unchanged, and pure.
+  `IsInstalled` is constantly true: the C# probes the Velopack per-user layout to
+  distinguish an installed copy from an unzipped portable run — Android has no portable
+  mode, every copy is package-installed.
+- **DC-78** BuildFlavor.Developer: the `DEVELOPER_BUILD` compilation symbol becomes a
+  source-level `const val` (false in customer builds). Flip procedure for a developer
+  build: set the const to `true` and rebuild (a Gradle build-config field can replace
+  the const when the release pipeline lands; the value and its consumers do not change).
+- **DC-79** SecretStore: DPAPI CurrentUser + entropy "InterviewAssistant.v1.apikey" →
+  the platform Keystore protector (P2) under the dedicated alias
+  "interview-assistant.apikey.v1" — the alias is the entropy binding, so the
+  SelfTestRoundTrip wrong-entropy leg unprotects with a different-alias protector and
+  must fail (in tests both protectors are keyed fakes). The protector is an installable
+  seam (`protector`, internal set) because the object is otherwise static like the C#.
+  The file name "apikey.dpapi" is kept for 1:1 layout parity (contents are platform
+  ciphertext on both platforms, never portable). `getApiKey`'s catch set adds
+  IllegalArgumentException — the platform protector's malformed-ciphertext signal (the
+  :core WorkspaceStore catch set includes it for the same reason).
+- **DC-80** Workspace: (a) `DpapiProtector` (defined in Workspace.cs) is not re-declared —
+  its Android counterpart is `KeystoreDataProtector` in the platform layer (P2/DC-3);
+  the composition root passes it to the Workspace constructor like the C# passes
+  DpapiProtector. (b) "Found next to the EXE": the shipped knowledge assets live in
+  :core's bundled assets (not files), so `extractBundledKnowledge(context)` copies
+  `assets/knowledge/` into `AppPaths.baseDirectory/knowledge` once (a `.stamp` file
+  holding the library asset's SHA-256 re-extracts after an app update changes the
+  assets); the constructor then runs the C#'s exact `FindDirectory(base, "knowledge",
+  LibraryFileName)` search over real files. (c) LoadActive's personal/boundary refresh:
+  the C# clears and refills the pack KB's lists in place; :core's CandidateProfile
+  holds immutable lists, so the knowledge base is rebuilt with a refreshed profile
+  copy — the returned KB carries the same current entries (the pack KB is itself
+  rebuilt by `toKnowledgeBase()` on every call, so no shared state differs).
+- **DC-81** AppLog: exception type names in `Describe` are JVM names (e.g.
+  AccessDeniedException where .NET says UnauthorizedAccessException); the rule —
+  IO/security exceptions by type name only, never the path-bearing message — is
+  unchanged. The daily-file append newline is the platform line separator ("\n" on
+  Android; C# `Environment.NewLine`). Prune deletes via `File.delete()` (boolean)
+  where C# `File.Delete` throws; only successful deletions are counted, as in C#.
+  Prune's date parse uses uuuuMMdd STRICT (TryParseExact counterpart).
+- **DC-82** Branding: a branding.json with a JSON null value for a key is refused as a
+  whole (kotlinx `Map<String, String>` rejects null values; STJ's
+  `Dictionary<string, string>` would admit it and assign null). Also: the override
+  directory on Android (app base directory) is not user-writable, so branding.json is
+  a support/diagnostics override rather than an end-user feature; `load(baseDir)`
+  keeps the C# signature and behavior for any directory.
+- **DC-83** Build: `:app` now applies the kotlin-serialization plugin (catalog alias,
+  same Kotlin version as :core) so the AppSettings serializer is generated in-module;
+  the serialization library dependency itself was already added by the DC-64 parent
+  resolution. No other dependency or build change.
+
+### Services NOT in this package (by-name accounting)
+
+- **AnswerServiceProbe.cs** (27) → P4-C: it is consumed by the Settings/developer-key UI
+  wiring with the view models; its provider (`OpenAiChatAnswerProvider`) is already
+  ported in :core (P3).
+- **AudioCaptureService.cs** (223) → P5 (WASAPI loopback → Android capture routes /
+  AudioPlaybackCapture per OD-4).
+- **HotkeyService.cs** (74) → P5 (global hotkeys → D2 Android substitutes; the stored
+  chord strings/defaults are already mirrored in AppSettings here).
+- **UpdateService.cs** (194) → P6 (Velopack → the project's own release system, D4);
+  `UpdatePolicy` itself is already ported in :client (P2).
+- **CloudService.cs** (405) → the service client itself is the P2 :client port
+  (Auth/BackendClient/CloudSession/CloudAnswerProvider + Keystore token store +
+  App Link redirect in platform/Platform.kt); the app-level composition/state wiring
+  lands in P4-C with MainViewModel.
+- **Authenticode.cs** (108) → P6 (WinVerifyTrust signer checks → Android APK signature
+  verification for the update path).
+- **WindowPlacement.cs** (133) → platform substitute: Android activities have no
+  user-managed window placement; the placement SETTINGS fields are mirrored in
+  AppSettings (protected from reset) and the Interview Focus geometry logic is
+  already mirrored in uistate/FocusPlacement (P4-A). The substitute takes effect in
+  the Live shell (P4-G); nothing else of WindowPlacement has an Android counterpart.
+- **SelfTest.cs** (789) → not ported as a harness: it drives the real WPF process
+  (windows, Dispatcher, XAML), which has no Android counterpart. Its ~35 checks are
+  distributed across the ported suites — this package covers the four listed under
+  Test mapping; the UiState checks landed in P4-A, the engine/knowledge checks in
+  P2/P3 (:core/:client suites), and the window/page-driving checks land with the
+  P4-D…G Compose counterparts or remain Windows-only (maximize/work-area, window
+  placement, XAML watermark rules).
+
+### Compile risks (self-identified, for CI)
+
+1. AppSettings' `@Transient` on the computed `answerFontSize`/`questionFontSize`
+   vals: expected to simply exclude them from the generated serializer; if the
+   plugin demands an initializer, dropping the annotation also excludes them
+   (no backing field).
+2. `SecretStore.protector` / `wrongEntropyProtector` and `BuildInfo.installInformationalVersion`
+   use internal visibility from the unit tests (friend-module access, the standard
+   Gradle/Kotlin unit-test setup).
+3. `AppSettings.serializer()` is called unqualified inside the class's own companion
+   (the generated member); `GuidNullableSerializer` follows the CI-verified
+   `CoreDateTimeNullableSerializer` pattern from :core.
+4. AppPaths/BuildInfo/Workspace reference Android classes (Context, PackageManager,
+   AssetManager) behind their seams; the classes load on the JVM unit-test classpath
+   (stub android.jar) and the Android paths are never invoked there.
