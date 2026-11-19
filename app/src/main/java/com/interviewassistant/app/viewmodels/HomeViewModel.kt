@@ -1344,6 +1344,10 @@ class HomeViewModel(
             if (target?.id == tg.id) target = tg
             refreshTargets(tg.id)
             refreshChecklist()
+            // The token is a child of the caller's job (the C#'s _prepCts needs no
+            // completion signal; a Kotlin Job does — an uncompleted child keeps a
+            // runBlocking caller waiting forever, DC-54's lesson).
+            token.complete()
         }
     }
 
