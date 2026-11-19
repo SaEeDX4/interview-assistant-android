@@ -7,7 +7,6 @@ import com.interviewassistant.core.knowledge.CandidateStory
 import com.interviewassistant.core.knowledge.TargetContext
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
-import java.util.regex.Pattern
 
 /**
  * Mirror of `InterviewAssistant.Core/Intelligence/FactValidator.cs` (TRANSFER-MAP §2, layer: Mirror).
@@ -84,7 +83,7 @@ class FactValidator(profile: CandidateProfile, context: TargetContext? = null, e
      * A past claim is supported when a confirmed evidence item covers most of its clause ("I led the Arzif growth
      * team to 60,000 traders" vs. the confirmed Arzif achievement). Generic words like "Engineering" never count.
      */
-    private fun isSupported(bullet: String, claim: MatchResult): Boolean {
+    private fun isSupported(bullet: String, claim: kotlin.text.MatchResult): Boolean {
         val rest = bullet.substring(claim.range.first + claim.value.length)
         val end = clauseEnd.find(rest)
         val clause = if (end != null) rest.substring(0, end.range.first) else rest
@@ -124,10 +123,7 @@ class FactValidator(profile: CandidateProfile, context: TargetContext? = null, e
         // The C#'s ClauseBoundary is the one Singleline regex in the file; the JVM needs DOTALL for the same
         // meaning, so this pattern is compiled directly instead of through the shared helper.
         private val clauseBoundary: Regex = Regex(
-            Pattern.compile(
-                "(.*)(\\bbut\\b|\\band\\b|\\bhowever\\b|\\balthough\\b|\\bwhile\\b|\\bthough\\b|[.;!?]|\\s[—–-]\\s)",
-                Pattern.UNICODE_CHARACTER_CLASS or Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CASE or Pattern.DOTALL,
-            ),
+            "(?iuUs)(.*)(\\bbut\\b|\\band\\b|\\bhowever\\b|\\balthough\\b|\\bwhile\\b|\\bthough\\b|[.;!?]|\\s[—–-]\\s)",
         )
 
         private fun leadIn(before: String): String {

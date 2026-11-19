@@ -1,7 +1,7 @@
 package com.interviewassistant.core.intelligence
 
 import com.interviewassistant.core.ingestion.dotNetRegex
-import com.interviewassistant.core.ingestion.regexEscape
+import com.interviewassistant.core.knowledge.regexEscape
 import com.interviewassistant.core.knowledge.TargetContext
 
 /**
