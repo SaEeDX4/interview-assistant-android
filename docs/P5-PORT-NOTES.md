@@ -161,3 +161,22 @@ Edited (sanctioned wiring points + DC-180):
 - **Battery-optimisation exemption flow** (D12 mentions the readiness check surfacing it):
   not built in P5 — the readiness surface for it belongs with the P6 device pass; the FGS +
   lease design already bound the damage of an OEM kill, as D12 records.
+
+## P5 CI VERIFICATION — COMPLETE (2026-11-19)
+
+GitHub Actions run #303 on head 2a181b5 — SUCCESS (1m34s), first
+attempt: :app:testDebugUnitTest EXECUTED fresh — 551/551 PASSED
+(514 prior + P5's 37); assembleDebug built; checksums 13/13 OK; other
+modules FROM-CACHE on identical inputs. Project total: 939 tests
+verified green (:app 551, :core 345, :client 32, :contracts 11).
+P5's implementation (capture service, FGS, shortcuts, PiP focus,
+DC-169…DC-181) is CI-verified.
+
+P5 exit-gate honesty note: the §7 gate — an end-to-end live session
+on a real device (relay transcription flow, heartbeat metering vs
+the server ledger, pause bills nothing, stop/expiry tail billing,
+60-min soak, D1 verified in mic and playback-capture modes) — remains
+OPEN. It is not CI-verifiable, and it is additionally blocked on P6:
+the update-service provider still throws (DC-181), so the app cannot
+yet be constructed end-to-end on a device. P6 closes that; the device
+session then runs as one combined P5+P6 gate.
