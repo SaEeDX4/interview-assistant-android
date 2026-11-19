@@ -1,5 +1,6 @@
 package com.interviewassistant.app.uistate
 
+import java.io.File
 import java.time.OffsetDateTime
 import java.time.ZoneOffset
 import kotlin.concurrent.thread
@@ -15,8 +16,9 @@ import org.junit.Test
 /**
  * Port of the Windows `Rc5ReadinessTests.cs`: one authoritative snapshot drives every readiness surface; Get
  * started offers exactly one next action; deep links resolve before a page is shown.
- * Deferred by name (WPF/view-model source scans; counterparts in P4-F): AutoFit_NeverRefitsTheSameInputs,
- * AuthorizedUse_IsAskedOnlyWhenListeningCanStart.
+ * Deferred by name (WPF/view-model source scan; the Live-window counterpart lands in P4-G):
+ * AutoFit_NeverRefitsTheSameInputs. AuthorizedUse_IsAskedOnlyWhenListeningCanStart was deferred
+ * to P4-F and is ported below.
  */
 class Rc5ReadinessTests {
     companion object {
@@ -273,5 +275,29 @@ class Rc5ReadinessTests {
         )
         for ((page, signedOut, expected) in cases)
             assertEquals(expected, HomeRoute(page).gate(signedOut).page)
+    }
+
+    @Test
+    fun authorizedUse_IsAskedOnlyWhenListeningCanStart() {
+        // Port of the C# source scan (deferred to P4-F): inside ToggleListeningCoreAsync the
+        // sign-in note comes first, the authorized-use confirmation second and the lease begins
+        // last — the consent prompt can only appear once listening can actually start.
+        val candidates = listOf(
+            File("src/main/java/com/interviewassistant/app/viewmodels/MainViewModel.kt"),
+            File("app/src/main/java/com/interviewassistant/app/viewmodels/MainViewModel.kt"),
+            File("../app/src/main/java/com/interviewassistant/app/viewmodels/MainViewModel.kt"),
+        )
+        val file = candidates.firstOrNull { it.isFile }
+        assertNotNull("MainViewModel.kt not found from the test working directory", file)
+        val source = file!!.readText(Charsets.UTF_8)
+        val fnStart = source.indexOf("fun toggleListeningCoreAsync")
+        assertTrue("toggleListeningCoreAsync not found", fnStart >= 0)
+        val body = source.substring(fnStart)
+        val note = body.indexOf("note_sign_in_to_listen")
+        val confirm = body.indexOf("confirmAuthorizedUseAsync")
+        val lease = body.indexOf("beginLeaseAsync()")
+        assertTrue("the sign-in note is missing", note >= 0)
+        assertTrue("the authorized-use confirmation must come after the sign-in note", confirm > note)
+        assertTrue("the lease must begin after the confirmation", lease > confirm)
     }
 }
