@@ -67,7 +67,7 @@ object ExportLabels {
     fun culture(lang: String?): Locale = LanguageRegistry.formattingLocale(code(lang))
 
     private fun chronology(lang: String?, locale: Locale): Chronology =
-        if (LanguageRegistry.usesGregorianCalendar(code(lang))) IsoChronology.INSTANCE else Chronology.fromLocale(locale)
+        if (LanguageRegistry.usesGregorianCalendar(code(lang))) IsoChronology.INSTANCE else Chronology.ofLocale(locale)
 
     /** "0 sec", "59 sec", "1 hr 20 min 43 sec" (localized units; zero parts left out). */
     fun duration(lang: String?, secondsIn: Long): String {
