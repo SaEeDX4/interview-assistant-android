@@ -19,12 +19,12 @@ import com.interviewassistant.core.intelligence.BulletStreamParser
 import com.interviewassistant.core.intelligence.Classification
 import com.interviewassistant.core.intelligence.ContextRetriever
 import com.interviewassistant.core.intelligence.ConversationTurn
-import com.interviewassistant.core.intelligence.DuplicateGuard
+import com.interviewassistant.core.turn.DuplicateGuard
 import com.interviewassistant.core.intelligence.EvidenceIndex
 import com.interviewassistant.core.intelligence.ExtractedQuestion
 import com.interviewassistant.core.intelligence.FactValidator
 import com.interviewassistant.core.intelligence.FollowUpIntent
-import com.interviewassistant.core.intelligence.LanguageDetector
+import com.interviewassistant.core.languages.LanguageDetector
 import com.interviewassistant.core.intelligence.MatchConfidence
 import com.interviewassistant.core.intelligence.MatchResult
 import com.interviewassistant.core.intelligence.PendingContext
@@ -194,12 +194,12 @@ class InterviewEngine(
     val logListeners: MutableList<(String) -> Unit> = mutableListOf()
 
     init {
-        val detector = TurnDetector(clock)
+        val detector = TurnDetector(this.clock)
         detector.aliases = kb.context.aliases
         detector.termNormalizer = kb.context::normalizeTerms
         detector.segmentFilter = ::keepSegment
         detector.partialFilter = ::trustPartial
-        detector.displayTailChars = maxOf(1000, options.liveTextMaxChars * 2)
+        detector.displayTailChars = maxOf(1000, this.options.liveTextMaxChars * 2)
         turn = detector
         detector.addLiveTextChangedListener { t ->
             liveText = t
