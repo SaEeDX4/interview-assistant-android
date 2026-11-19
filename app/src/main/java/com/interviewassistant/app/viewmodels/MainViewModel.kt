@@ -24,7 +24,7 @@ import com.interviewassistant.app.uistate.RelayConnection
 import com.interviewassistant.client.BackendException
 import com.interviewassistant.client.CloudAnswerProvider
 import com.interviewassistant.client.CloudSession
-import com.interviewassistant.client.CloudState
+import com.interviewassistant.app.services.CloudState
 import com.interviewassistant.contracts.AccountDto
 import com.interviewassistant.contracts.AnswerPurposes
 import com.interviewassistant.contracts.BillingStates
@@ -108,7 +108,7 @@ class MainViewModel(
     private val processStats: ProcessStatsProvider,
     private val workspaceFactory: (String, IDataProtector) -> Workspace = { root, protector -> Workspace(root, protector) },
     private val protectorFactory: () -> IDataProtector = { KeystoreDataProtector() },
-    private val connectionGate: ConnectionToastGate = ConnectionToastGate { OffsetDateTime.now(ZoneOffset.UTC) },
+    private val connectionGate: ConnectionToastGate = ConnectionToastGate({ OffsetDateTime.now(ZoneOffset.UTC) }),
     private val nowMillis: () -> Long = { System.currentTimeMillis() },
 ) : ObservableObject() {
 
@@ -866,10 +866,10 @@ class MainViewModel(
             _transcriberOptions!!.serverConfiguredSession = true // the server configures the upstream session for each relay connection
             _transcriberOptions!!.credentialRejected = { _cloudSession?.forceTokenRefresh() }
             _transcriberOptions!!.connectionRefused = { status -> post { scope.launch { onRelayRefusedAsync(status) } } }
-            _transcriber = OpenAiRealtimeTranscriber(::relayCredentialAsync, _transcriberOptions)
+            _transcriber = OpenAiRealtimeTranscriber(credentialProvider = ::relayCredentialAsync, _transcriberOptions)
         } else {
             _provider = OpenAiChatAnswerProvider(SecretStore::getApiKey, chatOptions())
-            _transcriber = OpenAiRealtimeTranscriber(SecretStore::getApiKey, _transcriberOptions)
+            _transcriber = OpenAiRealtimeTranscriber(apiKeyProvider = SecretStore::getApiKey, _transcriberOptions)
         }
         _transcriber!!.diagnosticListeners += { m -> AppLog.info(m) }
         val engine = InterviewEngine(
@@ -1013,9 +1013,9 @@ class MainViewModel(
             val opts = transcriberOptions()
             if (lease != null) useRelay(opts, lease)
             val t = if (lease != null)
-                OpenAiRealtimeTranscriber({ lease.nextConnectionCredentialAsync() }, opts)
+                OpenAiRealtimeTranscriber(credentialProvider = { lease.nextConnectionCredentialAsync() }, opts)
             else
-                OpenAiRealtimeTranscriber(SecretStore::getApiKey, opts)
+                OpenAiRealtimeTranscriber(apiKeyProvider = SecretStore::getApiKey, opts)
             try {
                 val text = StringBuilder()
                 val partials = mutableMapOf<String, String>()
