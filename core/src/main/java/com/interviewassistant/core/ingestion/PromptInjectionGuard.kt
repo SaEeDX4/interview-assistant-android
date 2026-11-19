@@ -1,6 +1,5 @@
 package com.interviewassistant.core.ingestion
 
-import java.util.regex.Pattern
 
 /**
  * Mirror of `InterviewAssistant.Core/Ingestion/PromptInjectionGuard.cs` (TRANSFER-MAP §2, layer: Mirror).
@@ -14,11 +13,9 @@ import java.util.regex.Pattern
  * Unicode-aware by default (`\w`, `\b`, `\d` cover all scripts) and `IgnoreCase | CultureInvariant` folds
  * case invariantly; the JVM needs UNICODE_CHARACTER_CLASS / UNICODE_CASE to mean the same thing.
  */
-internal fun dotNetRegex(pattern: String, ignoreCase: Boolean = false): Regex {
-    var flags = Pattern.UNICODE_CHARACTER_CLASS
-    if (ignoreCase) flags = flags or Pattern.CASE_INSENSITIVE or Pattern.UNICODE_CASE
-    return Regex(Pattern.compile(pattern, flags))
-}
+internal fun dotNetRegex(pattern: String, ignoreCase: Boolean = false): Regex =
+    Regex((if (ignoreCase) "(?iuU)" else "(?U)") + pattern)
+
 
 object PromptInjectionGuard {
     private val pattern: Regex = dotNetRegex(
