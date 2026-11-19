@@ -9,18 +9,18 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
-import java.net.SocketTimeoutException
 import java.nio.file.Files
 import java.time.OffsetDateTime
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.CompletableDeferred
+import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withContext
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -111,13 +111,20 @@ class CloudAuthTests {
     private class TestLoopbackReceiver(override val state: String = Pkce.createState()) : OAuthRedirectReceiver {
         private val server = ServerSocket()
 
+        /** Terminal outcome recorded by the accept thread; null = closed before any outcome. */
+        private val signal = CompletableDeferred<RedirectOutcome?>()
+
         @Volatile
         private var closedFlag = false
 
         init {
             // Bound in the constructor, like the C#'s TcpListener.Start: the redirect URI and port
-            // are known before the wait, and the OS backlog queues early connections.
+            // are known before the wait. The C#'s accepts are async I/O that keep progressing while
+            // the test's own thread blocks on synchronous socket calls; a daemon accept thread is
+            // the JVM equivalent (an accept loop inside waitForCode starved on the runBlocking
+            // event loop and hung CI run #78 in loopbackAcceptsOnlyMatchingStateOnCallbackPath).
             server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0), 8)
+            Thread({ acceptLoop() }, "test-loopback").apply { isDaemon = true }.start()
         }
 
         val port: Int get() = server.localPort
@@ -126,43 +133,53 @@ class CloudAuthTests {
             get() = "http://127.0.0.1:$port/callback?s=${UriEscape.escapeDataString(state)}"
 
         /**
-         * The C#'s `WaitForCodeAsync` control flow: the waiting coroutine itself runs the accept
-         * loop (blocking socket calls on [Dispatchers.IO]); an error redirect throws [AuthException]
-         * directly in the waiter, a code returns, and every other request is answered while the
-         * wait continues. (An earlier revision delivered the outcome through a background thread +
-         * `CompletableDeferred`; CI run #75 showed the stored AuthException surfacing as the test
-         * failure despite the test's catch, so the double now follows the C# shape exactly.)
+         * Waits for the accept thread's terminal outcome. The outcome travels as a VALUE and the
+         * [AuthException] is created and thrown here, in the waiter — never stored in a deferred
+         * (CI run #75: an AuthException stored via `completeExceptionally` surfaced as the failure
+         * of loopbackRejectsMalformedAndOversizedRequestsAndKeepsWaiting despite the test's catch
+         * around `await()`; the value-carrying code path in the same run passed).
          */
-        override suspend fun waitForCode(timeout: Duration): String = withContext(Dispatchers.IO) {
-            val deadlineNanos = System.nanoTime() + timeout.inWholeNanoseconds
-            while (true) {
-                val remainingMs = (deadlineNanos - System.nanoTime()) / 1_000_000
-                if (remainingMs <= 0) throw TimeoutException("Sign-in was not completed in the browser.")
-                server.soTimeout = remainingMs.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
-                val socket = try {
-                    server.accept()
-                } catch (e: SocketTimeoutException) {
-                    throw TimeoutException("Sign-in was not completed in the browser.")
-                } catch (e: SocketException) {
-                    // close() stopped the listener — the C#'s ObjectDisposedException path.
-                    if (closedFlag) throw TimeoutException("Sign-in was cancelled.")
-                    throw e
-                }
-                when (val outcome = handle(socket)) {
-                    is RedirectOutcome.Error -> throw AuthException("browser_error", outcome.error)
-                    is RedirectOutcome.Code -> return@withContext outcome.code
-                    else -> Unit // answered (or unreadable); keep waiting, like the C#
-                }
+        override suspend fun waitForCode(timeout: Duration): String {
+            val outcome = try {
+                withTimeout(timeout) { signal.await() }
+            } catch (e: TimeoutCancellationException) {
+                throw TimeoutException("Sign-in was not completed in the browser.")
             }
-            @Suppress("UNREACHABLE_CODE")
-            throw IllegalStateException("unreachable: the wait loop exits only by return or throw")
+            return when (outcome) {
+                is RedirectOutcome.Code -> outcome.code
+                is RedirectOutcome.Error -> throw AuthException("browser_error", outcome.error)
+                else -> throw TimeoutException("Sign-in was cancelled.") // closed first: the C#'s ObjectDisposedException path
+            }
         }
 
         override fun close() {
             closedFlag = true
+            signal.complete(null)
             try {
                 server.close()
             } catch (_: IOException) {
+            }
+        }
+
+        private fun acceptLoop() {
+            while (!closedFlag) {
+                val socket = try {
+                    server.accept()
+                } catch (e: Exception) {
+                    return // listener closed or broken: the wait resolves via close()/timeout
+                }
+                try {
+                    val outcome = handle(socket)
+                    if (outcome != null) {
+                        signal.complete(outcome)
+                        return // one-shot, like the C#: a terminal outcome ends the wait
+                    }
+                } catch (e: Exception) {
+                    try {
+                        socket.close()
+                    } catch (_: IOException) {
+                    }
+                }
             }
         }
 
