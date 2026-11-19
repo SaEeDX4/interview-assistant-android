@@ -1025,3 +1025,19 @@ returns.
   calls `job.complete()` in a finally. Cancellation semantics unchanged (cancelAnswer still
   cancels the same Job object; complete() on a cancelled job is a no-op). This was the only
   `Job(parent)` construction in the codebase (grep-verified across :core and :client).
+
+## CI fix round 6 (2026-11-19, after Actions run #153 on 1ba69cd)
+
+DC-54 verified working: the suite advanced to 184 PASSED / 0 failed (EngineAcceptance 12/12,
+EngineTests 14, LiveIntelligence 17, Rc2 30) before a second hang stopped it in
+Rc2EngineAcceptanceTests.pauseResumeTwice_OneContinuousSession_SevenOfSeven.
+
+- **DC-55 — test pump loops must yield (test-side only).** Four loops of the form
+  `while (!task.isCompleted) s.run(20)` (1 in Rc2EngineAcceptanceTests, 3 in SoakTests) pump
+  virtual time while an answer runs as an `async` child. In C# the answer Task runs on the
+  thread pool while the test thread pumps, so the loop interleaves naturally. On
+  runBlocking's single-threaded dispatcher the pump loop never suspends once no answer is in
+  flight (InterviewSimulator.run only delays while inFlight > 0), so the async child is
+  starved forever and the loop never exits. Fix: `{ s.run(20); yield() }` — the yield hands
+  the dispatcher to the queued answer coroutine, reproducing the C# interleaving. No
+  expectation, timing, or production code changed.
