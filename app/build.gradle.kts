@@ -44,6 +44,10 @@ dependencies {
     // SerializationException directly (P4-PORT-NOTES DC-64, parent-resolved), and the
     // settings model (P4-B) serializes settings.json with it.
     implementation(libs.kotlinx.serialization.json)
+    // OkHttp on :app's compile classpath too: CloudService constructs the auth/API clients itself
+    // (the C# constructs its HttpClients), with the same catalog artifact :core/:client use for
+    // the BCL HttpClient surface (P4-PORT-NOTES DC-85).
+    implementation(libs.okhttp)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
