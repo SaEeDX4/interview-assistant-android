@@ -511,7 +511,7 @@ class HomeViewModel(
     fun showRoute(route: HomeRoute) {
         showPage(route.page)
         if (page == "settings") settingsPage.showSection(route.section)
-        if (page == "profiles" && (route.section == "personal" || route.section == "facts")) setProfileTab(route.section)
+        if (page == "profiles" && (route.section == "personal" || route.section == "facts")) selectProfileTab(route.section)
     }
 
     /** Opens the Settings page (deep link from the Live Assistant gear and the pre-interview check). */
@@ -552,7 +552,7 @@ class HomeViewModel(
     suspend fun showInterviewProfile() {
         if (page != "profiles" && !nav.canProceedAsync(ChangeReason.Navigate, *guardsOfPage(page))) return
         showPage("profiles")
-        setProfileTab("personal")
+        selectProfileTab("personal")
     }
 
     fun onSettingsSaveClick() {
@@ -749,7 +749,7 @@ class HomeViewModel(
         return row
     }
 
-    fun setProfileTab(tab: String) {
+    fun selectProfileTab(tab: String) {
         profileTab = tab
         raise("profileTab")
     }
@@ -853,7 +853,7 @@ class HomeViewModel(
         AppLog.info("Resume imported: ${parsed.facts.size} facts, ${parsed.warnings.size} warnings, flags ${doc.securityFlags.size}")
         refreshProfiles(prof.id, reload = true)
         showPage("profiles")
-        setProfileTab("facts")
+        selectProfileTab("facts")
         refreshChecklist()
         notify(
             if (parsed.facts.isNotEmpty()) f("toast_resume_imported", parsed.facts.size) else t("toast_resume_no_facts"),
@@ -3592,7 +3592,7 @@ class HomeViewModel(
         vm.reportSavedListeners += reportSavedHandler
         Loc.addLanguageChangedListener(languageChangedHandler)
 
-        setProfileTab("facts")
+        selectProfileTab("facts")
         if (vm.cloud.isSignedIn && vm.cloud.state == CloudState.SignedIn && vm.cloud.account != null) {
             sections.summary.loaded(now())
         }
