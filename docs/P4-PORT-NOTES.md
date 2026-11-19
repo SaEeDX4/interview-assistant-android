@@ -1634,3 +1634,16 @@ also made every member access report unresolved); now the named-argument
 form MainViewModel uses (apiKeyProvider = SecretStore::getApiKey). The
 class's real surface (statusChangedListeners, startAsync, status,
 activeModel, disposeAsync) matches MainViewModel's verified usage.
+
+### P4-F CI VERIFICATION — COMPLETE (2026-11-19)
+
+GitHub Actions run #273 on head b8ec28a — SUCCESS (1m59s):
+:app:testDebugUnitTest EXECUTED fresh and the build succeeded (Gradle
+fails the build on any test failure), so all :app tests pass; :app @Test
+total is now 468 (461 + P4-F's 7: 6 PreInterviewControllerTests + the
+AuthorizedUse readiness port). assembleDebug built; checksums 13/13 OK;
+other modules FROM-CACHE on identical inputs. Project total: 856 tests
+verified green (:app 468, :core 345, :client 32, :contracts 11). P4-F
+(Account auth+dashboard, Help, PreInterview page + controller,
+DC-152…DC-157) is CI-verified complete. The P1 PreInterviewScreen
+placeholder was deleted from the repo in this package (commit cdbd964).
