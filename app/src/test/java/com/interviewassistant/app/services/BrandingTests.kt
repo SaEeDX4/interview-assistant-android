@@ -22,6 +22,12 @@ class BrandingTests {
 
     @After
     fun tearDown() {
+        // Branding is process-global: restore the defaults so later suites in the same JVM
+        // observe the same state this suite found (test isolation).
+        File(dir, "branding.json").writeText(
+            """{"ProductName": "Interview Assistant", "CompanyName": "Interview Assistant", "SupportUrl": ""}""",
+        )
+        Branding.load(dir.path)
         dir.deleteRecursively()
     }
 
