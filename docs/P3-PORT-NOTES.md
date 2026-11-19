@@ -1099,3 +1099,23 @@ suite) is simply too small for 345 tests and will be raised.
 Round-7 addendum: the first DC-56 push (7ff8202) failed to compile — Kotlin classes are
 final by default and SyntaxException was not declared `open`. Fixed by declaring
 `open class SyntaxException`. (Run #166 was spent on this compile error; no tests ran.)
+
+## CI fix round 8 (2026-11-19, after Actions run #168 on 41a4bc8)
+
+Diagnostic run #168 (3 classes): SecurityAuditExportTests 15/15 PASSED — DC-56 verified.
+Two findings remain, both in the timing/provider area:
+
+- **DC-57 — the GC mark must count full collections only.** With DC-53's reflective call
+  fixed, fiveMinuteMonologue now reaches its real assertion and fails it: "12 full GCs
+  during 3,000 deltas" against the C#'s gcPaused <= 5. Root cause is in the helper, not
+  the engine: usedHeapMark summed getCollectionCount over ALL collectors, so ordinary
+  young-generation collections were charged as full GCs. The C# samples
+  GC.CollectionCount(2) (generation 2 only). The helper now sums only old-generation
+  collectors (name contains Old / MarkSweep / Mark Sweep — G1 Old Generation,
+  PS MarkSweep, MarkSweepCompact, ConcurrentMarkSweep), falling back to all collectors
+  if none is recognised. No threshold or expectation changed.
+- The stalled-stream test was again cut off by the (diagnostic) 3-minute task cap after
+  the two long timing tests had consumed most of the budget, so its standalone behavior
+  is still unproven. It is being re-run with the timing tests under a 6-minute cap; if it
+  still does not finish in seconds there, the provider's AsyncTimeout path (which closes
+  the wrapped source from timedOut()) gets a dedicated dissection.
