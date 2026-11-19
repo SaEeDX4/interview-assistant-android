@@ -2,6 +2,11 @@ pluginManagement {
     repositories {
         google()
         mavenCentral()
+        // Same Maven Central mirror as below: the Kotlin compiler-plugin classpath
+        // (kotlin-compose-compiler-plugin-embeddable) resolves against THIS repository
+        // set — run #157 searched only repo.maven.apache.org despite the mirror being
+        // present in dependencyResolutionManagement.
+        maven { url = uri("https://maven-central.storage-download.googleapis.com/maven2") }
         gradlePluginPortal()
     }
 }
