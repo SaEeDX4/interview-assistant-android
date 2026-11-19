@@ -969,3 +969,11 @@ All fixes are compile-level Kotlin/JVM adaptations; no behavior, literal, or tes
   binds to the sync `Func<string?>` constructor now name it (`apiKeyProvider = { "k" }`).
 - **DC-52 — ExportLabels chronology.** `java.time.chrono.Chronology` has no `fromLocale`; the
   JVM counterpart of the C#'s culture calendar lookup is `Chronology.ofLocale(locale)`.
+
+## CI fix round 2 (2026-11-19, after Actions run #134 on 50401e2 — 4 errors)
+
+- **DC-50 correction.** `kotlinx.coroutines.resumeWithException` does not exist in
+  kotlinx-coroutines 1.9.0 (the round-1 import was itself unresolved). The two OkHttp bridge
+  call sites now use the `Continuation.resumeWith` member with `Result.failure(e)` — the same
+  exception delivery to the suspended caller; the `isActive` guard is unchanged. The other half
+  of DC-50 (`resume(value, null)`) compiled clean in run #134 and stands.
