@@ -680,6 +680,10 @@ class Rc2EngineTimingTests {
     private fun usedHeapMark(): Long {
         val beans = Class.forName("java.lang.management.ManagementFactory")
             .getMethod("getGarbageCollectorMXBeans").invoke(null) as List<*>
-        return beans.sumOf { b -> b!!.javaClass.getMethod("getCollectionCount").invoke(b) as Long }
+        // Invoke through the exported GarbageCollectorMXBean interface: the beans' runtime
+        // class (sun.management.GarbageCollectorImpl) is in a non-exported package, so a
+        // reflective call on the class itself throws IllegalAccessException.
+        val count = Class.forName("java.lang.management.GarbageCollectorMXBean").getMethod("getCollectionCount")
+        return beans.sumOf { b -> count.invoke(b) as Long }
     }
 }
