@@ -1060,3 +1060,12 @@ the log shows ONLY repo.maven.apache.org was searched — the
 kotlinCompilerPluginClasspathDebug configuration does not resolve against
 dependencyResolutionManagement repositories; it uses the pluginManagement set. The mirror
 has therefore also been added to pluginManagement repositories in settings.gradle.kts.
+
+Second correction (run #159 on de1f194): still only repo.maven.apache.org was searched,
+even with the mirror in both repository sets. That signature — a single searched location
+for the jar — means the module metadata is bound to Maven Central in the restored Gradle
+metadata cache (setup-gradle restores ~/.gradle across runs), i.e. a cached "jar missing"
+resolution is being replayed instead of a fresh lookup; while the task result itself came
+from the build cache no resolution was needed, which is why earlier runs passed. Remedy:
+the CI Gradle invocation now passes --refresh-dependencies, discarding cached resolution
+results so the module is resolved fresh (with the mirror available as fallback).
