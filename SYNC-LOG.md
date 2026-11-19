@@ -31,10 +31,13 @@ at the repository root so it is the first thing a reader of either repo finds �
 - BUILD VERIFIED: GitHub Actions run #51 on de4c489 = SUCCESS (1m52s): :app:assembleDebug + :core/:client/:contracts testDebugUnitTest all passed.
 - Windows baseline remains 4976e16 (read-only; untouched).
 
-## Sync #2 — 2026-11-18 — P2 Shared client (push pending CI verification at time of writing)
+## Sync #2 — 2026-11-18 — P2 Shared client (CI-VERIFIED 2026-11-19)
 - :contracts full port of ApiContracts.cs (27 DTOs, camelCase wire format verified from source — map §5.4 corrected).
 - :client full ports: Auth/PKCE, BackendClient (21 endpoints), CloudSession, CloudAnswerProvider, CloudOptions, InstallationIdentity, UpdatePolicy, OAuthRedirect (App Link equivalent of LoopbackRedirect, D5), TimeProvider.
 - Core dependency slice ported: Providers/Contracts, Loc + LanguageRegistry, ChatMessage, IDataProtector/NoProtection, InstallLayout.
 - :app platform: Keystore IDataProtector + token store (D3), App Link redirect receiver (D5).
 - Tests: CloudAuthTests + UpdatePolicyTests mirrored 28 methods / 47 cases; 11 contract JSON fixture tests.
 - Record: docs/P2-PORT-NOTES.md (completeness checklist + divergence candidates DC-2…DC-8).
+- CI verification: GitHub Actions run #84 on commit 9237f00 — SUCCESS (1m13s). :client 28/28 tests PASSED (22 CloudAuthTests + 1 InstallLayoutTests + 5 UpdatePolicyTests methods = the 28 methods / 47 cases), :app:assembleDebug built, shared-asset checksums all OK. :contracts fixtures execute fresh on the bookkeeping commit that follows this entry.
+- One test (loopbackRejectsMalformedAndOversizedRequestsAndKeepsWaiting) failed repeatedly for an ENVIRONMENT reason, never a product-code one: a failed plain `async` child of runBlocking cancels the parent job and is rethrown by runBlocking past the catch around await() (isolated by a temporary probe, runs #80/#81; probe deleted after diagnosis). Fix is test-side only: the two loopback tests run under supervisorScope — the faithful analog of the C# Task observation semantics. Recorded as DC-9 in docs/P2-PORT-NOTES.md.
+- Still open from the §7 P2 exit gate (stated honestly, not covered by CI): a real-device sign-in + device registration + config/plans/account fetch against the live shared backend, and a Backend.Tests re-run. Both are scheduled with the first runnable app shell (P4/P6 device testing); the shared backend itself is unchanged Windows code.
