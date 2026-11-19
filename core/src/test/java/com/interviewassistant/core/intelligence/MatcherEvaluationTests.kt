@@ -12,7 +12,7 @@ import org.junit.Test
  * Case table extracted verbatim from the C# source.
  */
 class MatcherEvaluationTests {
-    private data class Case(val spoken: String, val expected: String?, val area: String)
+    data class Case(val spoken: String, val expected: String?, val area: String)
 
     companion object {
         val cases: List<Case> = listOf(
