@@ -9,18 +9,18 @@ import java.net.InetSocketAddress
 import java.net.ServerSocket
 import java.net.Socket
 import java.net.SocketException
+import java.net.SocketTimeoutException
 import java.nio.file.Files
 import java.time.OffsetDateTime
 import java.util.concurrent.TimeoutException
 import kotlin.time.Duration
 import kotlin.time.Duration.Companion.milliseconds
 import kotlin.time.Duration.Companion.seconds
-import kotlinx.coroutines.CompletableDeferred
-import kotlinx.coroutines.TimeoutCancellationException
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.async
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeout
+import kotlinx.coroutines.withContext
 import kotlinx.serialization.json.Json
 import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
@@ -110,14 +110,14 @@ class CloudAuthTests {
      */
     private class TestLoopbackReceiver(override val state: String = Pkce.createState()) : OAuthRedirectReceiver {
         private val server = ServerSocket()
-        private val completion = CompletableDeferred<String>()
 
         @Volatile
         private var closedFlag = false
 
         init {
+            // Bound in the constructor, like the C#'s TcpListener.Start: the redirect URI and port
+            // are known before the wait, and the OS backlog queues early connections.
             server.bind(InetSocketAddress(InetAddress.getByName("127.0.0.1"), 0), 8)
-            Thread({ acceptLoop() }, "test-loopback").apply { isDaemon = true }.start()
         }
 
         val port: Int get() = server.localPort
@@ -125,65 +125,70 @@ class CloudAuthTests {
         override val redirectUri: String
             get() = "http://127.0.0.1:$port/callback?s=${UriEscape.escapeDataString(state)}"
 
-        override suspend fun waitForCode(timeout: Duration): String {
-            try {
-                return withTimeout(timeout) { completion.await() }
-            } catch (e: TimeoutCancellationException) {
-                throw TimeoutException("Sign-in was not completed in the browser.")
-            } catch (e: ReceiverClosedException) {
-                throw TimeoutException("Sign-in was cancelled.")
+        /**
+         * The C#'s `WaitForCodeAsync` control flow: the waiting coroutine itself runs the accept
+         * loop (blocking socket calls on [Dispatchers.IO]); an error redirect throws [AuthException]
+         * directly in the waiter, a code returns, and every other request is answered while the
+         * wait continues. (An earlier revision delivered the outcome through a background thread +
+         * `CompletableDeferred`; CI run #75 showed the stored AuthException surfacing as the test
+         * failure despite the test's catch, so the double now follows the C# shape exactly.)
+         */
+        override suspend fun waitForCode(timeout: Duration): String = withContext(Dispatchers.IO) {
+            val deadlineNanos = System.nanoTime() + timeout.inWholeNanoseconds
+            while (true) {
+                val remainingMs = (deadlineNanos - System.nanoTime()) / 1_000_000
+                if (remainingMs <= 0) throw TimeoutException("Sign-in was not completed in the browser.")
+                server.soTimeout = remainingMs.coerceIn(1L, Int.MAX_VALUE.toLong()).toInt()
+                val socket = try {
+                    server.accept()
+                } catch (e: SocketTimeoutException) {
+                    throw TimeoutException("Sign-in was not completed in the browser.")
+                } catch (e: SocketException) {
+                    // close() stopped the listener — the C#'s ObjectDisposedException path.
+                    if (closedFlag) throw TimeoutException("Sign-in was cancelled.")
+                    throw e
+                }
+                when (val outcome = handle(socket)) {
+                    is RedirectOutcome.Error -> throw AuthException("browser_error", outcome.error)
+                    is RedirectOutcome.Code -> return@withContext outcome.code
+                    else -> Unit // answered (or unreadable); keep waiting, like the C#
+                }
             }
         }
 
         override fun close() {
             closedFlag = true
-            completion.completeExceptionally(ReceiverClosedException())
             try {
                 server.close()
             } catch (_: IOException) {
             }
         }
 
-        private class ReceiverClosedException : Exception()
-
-        private fun acceptLoop() {
-            while (!closedFlag) {
-                val socket = try {
-                    server.accept()
-                } catch (e: SocketException) {
-                    return
-                } catch (e: IOException) {
-                    return
-                }
-                try {
-                    handle(socket)
-                } catch (e: Exception) {
-                    try {
-                        socket.close()
-                    } catch (_: IOException) {
-                    }
-                }
-            }
-        }
-
-        private fun handle(socket: Socket) {
+        /** Handles one connection; returns the terminal outcome, or null while the wait continues. */
+        private fun handle(socket: Socket): RedirectOutcome? {
             socket.use {
                 val target = readTarget(it)
-                if (readFailed) return // the C# returns without a response when the read itself fails
+                if (readFailed) return null // the C# returns without a response when the read itself fails
                 if (target == null) {
                     respond(it, 400, Loc.t("browser_bad_request"))
-                    return
+                    return null
                 }
-                when (val outcome = RedirectUriParser.evaluate("http://127.0.0.1$target", state)) {
-                    RedirectOutcome.NotOurs -> respond(it, 404, "Not found.")
-                    RedirectOutcome.MissingCode -> respond(it, 400, Loc.t("browser_missing_code"))
+                return when (val outcome = RedirectUriParser.evaluate("http://127.0.0.1$target", state)) {
+                    RedirectOutcome.NotOurs -> {
+                        respond(it, 404, "Not found.")
+                        null
+                    }
+                    RedirectOutcome.MissingCode -> {
+                        respond(it, 400, Loc.t("browser_missing_code"))
+                        null
+                    }
                     is RedirectOutcome.Error -> {
                         respond(it, 400, Loc.t("browser_sign_in_failed"))
-                        completion.completeExceptionally(AuthException("browser_error", outcome.error))
+                        outcome
                     }
                     is RedirectOutcome.Code -> {
                         respond(it, 200, Loc.t("browser_signed_in"))
-                        completion.complete(outcome.code)
+                        outcome
                     }
                 }
             }
