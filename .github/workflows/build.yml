@@ -15,5 +15,12 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
       - run: gradle :app:assembleDebug :core:testDebugUnitTest :client:testDebugUnitTest :contracts:testDebugUnitTest
+      - name: Upload unit-test reports (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: unit-test-reports
+          path: "**/build/test-results/**"
+          if-no-files-found: ignore
       - name: Verify shared assets are byte-identical (checksums)
         run: cd parity && sha256sum -c assets.sha256
