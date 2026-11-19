@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Paths the shell may hand to other apps through the FileProvider (P4-E): the app's internal
+     files (report viewer copies, the log folder) and its cache (staged exports). -->
+<paths>
+    <files-path name="files" path="." />
+    <cache-path name="cache" path="." />
+</paths>
