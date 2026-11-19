@@ -1539,3 +1539,14 @@ shell builds it exactly there, bound to the VM's pf*/readinessFooter* state.
   border), the readiness card (padding 14×10) and the sticky bars are drawn with IaCard's
   exact drawing values (Surface background, 1 dp border, radius 12) and the border/padding
   the XAML specifies for each.
+
+### P4-E CI fix round 1 (DC-151)
+
+Run #256 on head 01eb34b failed at :app:compileDebugKotlin with 46 syntax
+errors in HomeUi.kt (lines 135–139): a KDoc comment quoted the WPF star
+sizing literally as "32*/68*", and the embedded */ terminated the comment
+early, turning the remaining comment text into code. The phrase now reads
+"32-star / 68-star". A sweep for the digit-*/ pattern across all P4-E files
+found one more instance, inside a // line comment in HomeLayoutTest.kt,
+which is harmless and left as-is. (The apparent mojibake near it is just
+the UTF-8 § sign shown by cat -A; the file encoding is correct.)
