@@ -61,6 +61,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.interviewassistant.app.services.Branding
+import com.interviewassistant.app.ui.account.AccountPage
 import com.interviewassistant.app.ui.components.AppDialogHost
 import com.interviewassistant.app.ui.components.Btn
 import com.interviewassistant.app.ui.components.DialogController
@@ -72,6 +73,9 @@ import com.interviewassistant.app.ui.components.IaIcon
 import com.interviewassistant.app.ui.components.ToastController
 import com.interviewassistant.app.ui.components.ToastHost
 import com.interviewassistant.app.ui.components.iaButtonFocusRing
+import com.interviewassistant.app.ui.help.HelpPage
+import com.interviewassistant.app.ui.preinterview.PreInterviewPage
+import com.interviewassistant.app.ui.preinterview.PreInterviewPageControllerImpl
 import com.interviewassistant.app.ui.theme.IaTextStyles
 import com.interviewassistant.app.ui.theme.IaTokens
 import com.interviewassistant.app.ui.theme.LocalIaColors
@@ -89,8 +93,8 @@ import com.interviewassistant.core.languages.Loc
  *
  * Layout follows §3.3: a navigation rail on expanded widths (the C# sidebar's form), a bottom
  * navigation bar on compact widths (DC-149); the page margin is 8/0/16/8 and the content is at
- * most 1120 wide. The Account / PreInterview / Settings / Help page bodies plug into the page
- * dispatch in P4-F and P4-G (DC-136); the shell chrome for them — footers included — is here.
+ * most 1120 wide. The Account / PreInterview / Help page bodies plug into the page dispatch
+ * (P4-F, DC-136); the Settings body follows in P4-G. The shell chrome — footers included — is here.
  */
 @Composable
 fun HomeScreen(
@@ -98,6 +102,7 @@ fun HomeScreen(
     dialogs: DialogController,
     toasts: ToastController,
     focusRegistry: FocusRegistry,
+    preInterview: PreInterviewPageControllerImpl,
     modifier: Modifier = Modifier,
 ) {
     val colors = LocalIaColors.current
@@ -120,10 +125,10 @@ fun HomeScreen(
                         when (HomeLayout.navForm(maxWidth.value)) {
                             NavForm.Rail -> Row(Modifier.fillMaxSize()) {
                                 NavRail(home, page)
-                                ContentColumn(home, page, focusRegistry, Modifier.weight(1f))
+                                ContentColumn(home, page, focusRegistry, preInterview, Modifier.weight(1f))
                             }
                             NavForm.Bottom -> Column(Modifier.fillMaxSize()) {
-                                ContentColumn(home, page, focusRegistry, Modifier.weight(1f))
+                                ContentColumn(home, page, focusRegistry, preInterview, Modifier.weight(1f))
                                 LanguageStrip(home)
                                 BottomNav(home, page)
                             }
@@ -558,7 +563,13 @@ private fun NavItem(tag: String, label: String, active: Boolean, modifier: Modif
 // ---------------------------------------------------------------------------
 
 @Composable
-private fun ContentColumn(home: HomeViewModel, page: String, focusRegistry: FocusRegistry, modifier: Modifier = Modifier) {
+private fun ContentColumn(
+    home: HomeViewModel,
+    page: String,
+    focusRegistry: FocusRegistry,
+    preInterview: PreInterviewPageControllerImpl,
+    modifier: Modifier = Modifier,
+) {
     val scrollState = rememberScrollState()
     // Entering a page scrolls back to the top (the C#'s ShowPage).
     LaunchedEffect(page) { scrollState.scrollTo(0) }
@@ -585,9 +596,11 @@ private fun ContentColumn(home: HomeViewModel, page: String, focusRegistry: Focu
                         "profiles" -> ProfilesPage(home, focusRegistry)
                         "interviews" -> InterviewsPage(home, focusRegistry)
                         "reports" -> ReportsPage(home, focusRegistry)
-                        // "preinterview" (P4-F), "account" (P4-F), "settings" (P4-G) and
-                        // "help" (P4-F) plug in here in their packages (DC-136); until then the
-                        // route renders the shell chrome with an empty content region.
+                        "preinterview" -> PreInterviewPage(home, preInterview)
+                        "account" -> AccountPage(home, focusRegistry)
+                        "help" -> HelpPage(home)
+                        // "settings" plugs in here in P4-G (DC-136); until then the route
+                        // renders the shell chrome with an empty content region.
                         else -> Unit
                     }
                 }
