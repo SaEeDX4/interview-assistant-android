@@ -137,8 +137,8 @@ class ProfileBundleContent(
 
 /**
  * ".iaprofile" backup & transfer bundle: a ZIP holding manifest.json (format "iaprofile", version 1, app version,
- * creation time, counts and the SHA-256 of every other entry), profile.json, targets/*.json, packs/*.json and
- * sessions/*.json. Unlike the DPAPI-encrypted workspace (readable only by the same Windows user on the same PC), the
+ * creation time, counts and the SHA-256 of every other entry), profile.json, the per-target JSON files, the per-pack JSON files and the
+ * per-session JSON files. Unlike the DPAPI-encrypted workspace (readable only by the same Windows user on the same PC), the
  * bundle can be restored on another PC. Secrets are filtered on write. Reading treats the file as untrusted input:
  * size and entry limits, a strict entry-name allow-list (no traversal), hash verification and JSON validation, and
  * importing always creates a NEW profile with new ids (nothing on the PC is overwritten).
