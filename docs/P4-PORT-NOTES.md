@@ -1267,3 +1267,18 @@ waits forever for the uncompleted child Job — DC-54's exact mechanism, second
 instance (the engine's instance was fixed in P3; this one is new in C3). The token
 now completes in the run's finally. Cancellation semantics unchanged (a later run
 still cancels the previous token; cancelling a completed Job is a no-op).
+
+### P4-C3 CI VERIFICATION — COMPLETE (2026-11-19)
+
+GitHub Actions run #234 on head 0ba11a2 — SUCCESS (2m23s):
+:app:testDebugUnitTest EXECUTED fresh — 353/353 PASSED (counted from the job
+log's per-test lines), :app:assembleDebug built, shared-asset checksums 13/13
+OK; :core/:client/:contracts FROM-CACHE on identical inputs (their verified
+totals stand: 345 + 32 + 11). Project total: 741 tests verified green.
+P4-C3 (HomeViewModel, 3,604 lines + HomeRows 444; 119 new tests) is
+CI-verified complete. Fix rounds DC-120…DC-123: every failure traced to a
+call-site defect, a test-harness/lifecycle cause, or a wrong test premise —
+in each case the ported production code was verified faithful to the C#
+before any fix was made; no expected value was ever changed to fit the port.
+(Two "Failed to save cache entry" warnings in the run's post-step are cache
+contention noise, not failures.)
