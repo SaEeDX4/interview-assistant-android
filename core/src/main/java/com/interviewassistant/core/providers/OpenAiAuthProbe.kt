@@ -5,7 +5,6 @@ import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.TimeoutCancellationException
 import kotlinx.coroutines.currentCoroutineContext
 import kotlinx.coroutines.isActive
-import kotlinx.coroutines.resumeWithException
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeout
 import okhttp3.Call
@@ -43,7 +42,7 @@ object OpenAiAuthProbe {
                 suspendCancellableCoroutine { cont ->
                     call.enqueue(object : Callback {
                         override fun onFailure(call: Call, e: IOException) {
-                            if (cont.isActive) cont.resumeWithException(e)
+                            if (cont.isActive) cont.resumeWith(Result.failure(e))
                         }
 
                         override fun onResponse(call: Call, response: Response) {
