@@ -1225,3 +1225,20 @@ defaults in tearDown via a defaults branding.json. Its assertions are unchanged.
 
 Run #226 on head 3f5b4ae: test compilation failed — MainViewModelFixture.kt used
 runBlocking in the new close() without importing it. Import added; nothing else.
+
+### P4-C3 CI fix round 7 (DC-122)
+
+Run #228 on head d294b58: 353 executed, 9 failed — all in Interviews + Relocalization,
+one root cause with two faces, both TEST-PREMISE errors against the C# (the port was
+verified faithful line-by-line in both places):
+(1) TARGET SELECTION: C# RefreshProfiles has a first-item fallback
+(selectId ?? profile ?? ActiveProfileId ?? list.First) but C# RefreshTargets does
+NOT (selectId ?? current-profile target ?? ActiveTargetId) — a seeded target is not
+auto-selected; in the app it becomes the editor's target via SaveTarget's
+RefreshTargets(t.Id) or a list click. The fixture's addTarget now mirrors SaveTarget:
+refreshTargets(tg.id). The port's refreshTargets was confirmed identical to C#.
+(2) LANGUAGE SWITCHING: three relocalization tests set Loc.language directly. In the
+app (both platforms) the Live VM's LanguageChanged handler re-asserts the SETTINGS
+language (RefreshLanguage: Loc.Language = UiLanguage), so a direct Loc poke is
+reverted — the tests now switch through Home.onUiLanguageChanged, the window
+language box's real path (settings first, then re-render). All assertions unchanged.
