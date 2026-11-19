@@ -385,6 +385,7 @@ class CloudAuthTests {
             assertFalse(wait.isCompleted)
             val (errCode, _) = httpGet(loop.redirectUri + "&error=access_denied&error_description=User%20cancelled")
             assertEquals(400, errCode)
+            try {
                 wait.await()
                 fail("expected AuthException")
             } catch (e: AuthException) {
