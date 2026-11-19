@@ -42,6 +42,10 @@ enum class IaGlyph(val codePoint: Int, @DrawableRes val drawable: Int) {
     Delete(0xE74D, R.drawable.ic_glyph_delete),
     List(0xE8FD, R.drawable.ic_glyph_list),
     Report(0xE9F9, R.drawable.ic_glyph_report),
+    // Added in P4-F (DC-156, additive only): the Account page's refresh button (E72C) and the
+    // device rows' monitor glyph (E7F8) had no drawable in the P4-D set.
+    Refresh(0xE72C, R.drawable.ic_glyph_refresh),
+    Devices(0xE7F8, R.drawable.ic_glyph_devices),
 }
 
 /** Draws one [IaGlyph] at [size] with [tint] (the XAML renders the glyph font at a font size; here, a square box). */
