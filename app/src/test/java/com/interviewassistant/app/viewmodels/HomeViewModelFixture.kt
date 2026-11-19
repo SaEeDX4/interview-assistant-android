@@ -73,6 +73,7 @@ class HomeFixture(val cloud: VmCloudFixture, initial: HomeRoute? = null) {
         val p = CandidateProfileRecord(name = name)
         p.facts += facts
         store().saveProfile(p)
+        home.refreshProfiles()
         return store().getProfile(p.id)!!
     }
 
@@ -83,6 +84,7 @@ class HomeFixture(val cloud: VmCloudFixture, initial: HomeRoute? = null) {
     ): InterviewTarget {
         val tg = InterviewTarget(profileId = profileId, jobTitle = title, company = company)
         store().saveTarget(tg)
+        home.refreshTargets()
         return store().getTarget(tg.id)!!
     }
 

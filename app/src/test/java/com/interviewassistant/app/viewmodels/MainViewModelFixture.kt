@@ -270,6 +270,7 @@ class VmFixture(val cloud: VmCloudFixture) {
     }
 
     fun close() {
+        runBlocking { vm.disposeAsync() }
         scope.cancel()
         SecretStore.protector = previousProtector
         cloud.close()
