@@ -54,6 +54,12 @@ val coverageClassDirs = files(
     fileTree("${layout.buildDirectory.get().asFile}/intermediates/javac/debug/classes") { exclude(coverageExcludes) },
 )
 val coverageExecData = fileTree(layout.buildDirectory.get().asFile) {
+    // The Gradle jacoco plugin writes the Test task's exec data to
+    // jacoco/<task>.exec; AGP's managed coverage writes it under
+    // outputs/unit_test_code_coverage/. Accept both — an empty
+    // executionData set makes the JaCoCo tasks SKIP themselves, which
+    // would silently disable the gate (DC-198).
+    include("jacoco/testDebugUnitTest.exec")
     include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
 }
 
