@@ -187,3 +187,28 @@ library is not justified; androidx.browser is pinned to 1.8.0 instead
 — the release built against SDK 35, with the identical Custom Tabs
 API surface the launcher uses (CustomTabsIntent has been stable since
 1.0). DC-182's dependency record stands with this version correction.
+
+## P6 CI VERIFICATION — COMPLETE (2026-11-19)
+
+- Run #319 on head 4223cb0 — SUCCESS (build job 5m13s; BUILD
+  SUCCESSFUL in 4m45s; 91 tasks executed, 22 from cache).
+  :app:testDebugUnitTest EXECUTED fresh — :app 595/595 PASSED
+  (551 prior + 44 new P6 tests); project total 983 verified green
+  (:app 595, :core 345, :client 32, :contracts 11);
+  :app:assembleDebug built; parity checksums 13/13 OK.
+  Run: https://github.com/SaEeDX4/interview-assistant-android/actions/runs/44645523797
+- One fix round was needed (DC-190): androidx.browser 1.9.0 required
+  compileSdk 36 / AGP 8.9.1+; pinned to 1.8.0 for the project's
+  compileSdk 35 / AGP 8.7.3 stack. Run #317 failed at
+  :app:checkDebugAarMetadata before any compilation; no test or
+  product code was affected.
+- DC-91 is FULLY resolved: the app is constructible end-to-end
+  (real update service + real capture service). This unblocks the
+  combined P5+P6 real-device gate.
+- Still open (owner/device, NOT CI-verifiable, stated in the P6
+  report): OD-3 Play Console steps (developer-account check,
+  pro_monthly product creation, license testers); the server-side
+  Play→backend verification bridge (Windows-repo change, needs
+  Saeed's separate approval — DC-187); Paddle-sandbox upgrade flow,
+  export/delete, update E2E, and the combined live session — all on
+  a real device.
