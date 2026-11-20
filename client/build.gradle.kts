@@ -2,6 +2,7 @@ plugins {
     alias(libs.plugins.android.library)
     alias(libs.plugins.kotlin.android)
     alias(libs.plugins.kotlin.serialization)
+    jacoco
 }
 
 android {
@@ -30,4 +31,55 @@ dependencies {
     implementation(libs.kotlinx.coroutines.android)
     implementation(libs.kotlinx.serialization.json)
     testImplementation(libs.junit)
+}
+
+// P7 (TRANSFER-MAP §5.5): JaCoCo line-coverage gate for the mirror modules. AGP writes the
+// unit-test execution data when the jacoco plugin is applied; the verification task enforces
+// the §5.5 floor (>= 90% line coverage per module) and fails the build below it. The report
+// task emits per-package XML/HTML (the §5.5 per-package reporting for Intelligence, Turn,
+// Live, Preparation and Audio). Measured numbers are recorded in docs/P7-PORT-NOTES.md.
+jacoco {
+    toolVersion = "0.8.12"
+}
+
+tasks.withType<Test>().configureEach {
+    extensions.configure<JacocoTaskExtension> {
+        isIncludeNoLocationClasses = true
+    }
+}
+
+val coverageExcludes = listOf("**/R.class", "**/R$*.class", "**/BuildConfig.*", "**/Manifest*.*")
+val coverageClassDirs = files(
+    fileTree("${layout.buildDirectory.get().asFile}/tmp/kotlin-classes/debug") { exclude(coverageExcludes) },
+    fileTree("${layout.buildDirectory.get().asFile}/intermediates/javac/debug/classes") { exclude(coverageExcludes) },
+)
+val coverageExecData = fileTree(layout.buildDirectory.get().asFile) {
+    include("outputs/unit_test_code_coverage/debugUnitTest/testDebugUnitTest.exec")
+}
+
+tasks.register<JacocoReport>("jacocoTestReport") {
+    dependsOn("testDebugUnitTest")
+    reports {
+        xml.required.set(true)
+        html.required.set(true)
+    }
+    classDirectories.setFrom(coverageClassDirs)
+    sourceDirectories.setFrom(files("src/main/java"))
+    executionData.setFrom(coverageExecData)
+}
+
+tasks.register<JacocoCoverageVerification>("jacocoTestCoverageVerification") {
+    dependsOn("testDebugUnitTest")
+    violationRules {
+        rule {
+            limit {
+                counter = "LINE"
+                value = "COVEREDRATIO"
+                minimum = "0.90".toBigDecimal()
+            }
+        }
+    }
+    classDirectories.setFrom(coverageClassDirs)
+    sourceDirectories.setFrom(files("src/main/java"))
+    executionData.setFrom(coverageExecData)
 }
