@@ -361,3 +361,32 @@ matching row (the two-direction LicenseComplianceTests pin catalog
 <-> notices). An earlier checker report for this run quoted plugin
 versions that exist nowhere in this project (AGP 8.13.2 / Kotlin
 2.2.21); it was set aside and the log re-read verbatim before acting.
+
+## P8 CI VERIFICATION — COMPLETE (the CI-verifiable subset)
+
+Run #356 on head 9fdccc7 — SUCCESS.
+
+- The release step EXECUTED and SUCCEEDED: :app:assembleRelease and
+  :app:bundleRelease both ran — "BUILD SUCCESSFUL" (161 tasks).
+  lintVitalRelease passes with the DC-210 dependency declared.
+- The "app-release" artifact (APK + AAB) was uploaded for the run
+  (18,509,090 bytes). The artifacts are UNSIGNED, exactly as designed
+  (DC-204): CI carries no signing material; signing is the local
+  owner step in the §5.1 runbook with the §3 key.
+- The signing-material guard step PASSED ("no keystore files,
+  literal signing passwords or private-key material in the tree").
+- :app:testDebugUnitTest EXECUTED fresh and passed (the full
+  1,133-test project suite stands); the JaCoCo step PASSED with the
+  measured counters unchanged (:client missed 44 / covered 704 =
+  94.1%; :core missed 729 / covered 6,758 = 90.3%); shared-asset
+  checksums 13/13 OK.
+- Fix rounds: DC-208 (empty signing env counts as absent), DC-209
+  (notices wired through the AGP variant API), DC-210
+  (fragment-ktx declared for lintVitalRelease).
+
+P8 status: the build/packaging half of the §7 P8 gate is verified.
+The gate's remaining half is owner-executed by design and is NOT
+claimed here: signing + publication through the release panel and
+Play (runbook §5.1/§5.2, incl. OD-3), and the device smoke test
+(§5.3). SYNC-LOG Sync #8 records this state and names the mirrored
+Windows commit; it does not claim publication.
