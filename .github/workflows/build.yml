@@ -18,7 +18,16 @@ jobs:
       # P7 (TRANSFER-MAP §5.5): coverage gate — :core and :client must stay at or above
       # 90% line coverage; jacocoTestCoverageVerification fails the build below the floor.
       # The report tasks emit the per-package XML/HTML coverage reports.
-      - run: gradle :core:jacocoTestReport :client:jacocoTestReport :core:jacocoTestCoverageVerification :client:jacocoTestCoverageVerification
+      # --no-build-cache: the coverage gate must measure THIS tree on every run;
+      # a cached verification verdict is not a measurement (P7 fix round 4).
+      - run: gradle --no-build-cache :core:jacocoTestReport :client:jacocoTestReport :core:jacocoTestCoverageVerification :client:jacocoTestCoverageVerification
+      - name: Print measured line coverage (JaCoCo XML totals)
+        if: always()
+        run: |
+          for f in $(find . -path '*reports/jacoco*' -name '*.xml' | sort); do
+            echo "== $f"
+            grep -o '<counter type="LINE"[^>]*/>' "$f" | tail -1
+          done
       - name: Upload unit-test reports (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
