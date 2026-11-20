@@ -260,3 +260,17 @@ needed; nothing was changed.
    (device/emulator pass).
 4. The notices-in-release-package step — DC-193 (P8 packaging).
 5. The `pf_title` table fix — DC-196 (Windows lockstep change).
+
+### P7 CI fix round 1 (DC-197)
+
+Run #330 on head b61230f failed in :core:testDebugUnitTest before any
+test executed: every Gradle Test Executor fork crashed with
+NoClassDefFoundError: jdk/internal/reflect/
+GeneratedSerializationConstructorAccessor1. Root cause is in the P7
+JaCoCo wiring itself: the Test-task JaCoCo extension set
+isIncludeNoLocationClasses = true, which makes the agent instrument
+classes with no source location — including JDK-internal generated
+serialization accessors, whose instrumented forms then fail to load
+in the test JVM. The JaCoCo default (false) exists precisely to
+exclude such classes. Both :core and :client build files now set it
+to false explicitly. No test, target or threshold was changed.
