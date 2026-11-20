@@ -15,12 +15,23 @@ jobs:
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
       - run: gradle --refresh-dependencies :app:assembleDebug :app:testDebugUnitTest :core:testDebugUnitTest :client:testDebugUnitTest :contracts:testDebugUnitTest
+      # P7 (TRANSFER-MAP §5.5): coverage gate — :core and :client must stay at or above
+      # 90% line coverage; jacocoTestCoverageVerification fails the build below the floor.
+      # The report tasks emit the per-package XML/HTML coverage reports.
+      - run: gradle :core:jacocoTestReport :client:jacocoTestReport :core:jacocoTestCoverageVerification :client:jacocoTestCoverageVerification
       - name: Upload unit-test reports (on failure)
         if: failure()
         uses: actions/upload-artifact@v4
         with:
           name: unit-test-reports
           path: "**/build/test-results/**"
+          if-no-files-found: ignore
+      - name: Upload coverage reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-reports
+          path: "**/build/reports/jacoco/**"
           if-no-files-found: ignore
       - name: Verify shared assets are byte-identical (checksums)
         run: cd parity && sha256sum -c assets.sha256
