@@ -48,6 +48,10 @@ dependencies {
     // (the C# constructs its HttpClients), with the same catalog artifact :core/:client use for
     // the BCL HttpClient surface (P4-PORT-NOTES DC-85).
     implementation(libs.okhttp)
+    // P6 (P6-PORT-NOTES DC-182): Google Play Billing (OD-1: Android billing is Play Billing) and
+    // Custom Tabs for the Paddle checkout/portal path (TRANSFER-MAP §6.2 browser row).
+    implementation(libs.play.billing)
+    implementation(libs.androidx.browser)
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
