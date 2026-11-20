@@ -14,6 +14,30 @@ jobs:
           distribution: temurin
           java-version: "17"
       - uses: gradle/actions/setup-gradle@v4
+      # P8 (P8-PORT-NOTES DC-204): signing material must never enter this tree.
+      # Fails the build if a keystore/binary key file appears anywhere, if a real
+      # PEM private-key body (BEGIN line followed by a long base64 line) appears in
+      # a text file, or if a literal signing password is assigned in a Gradle file.
+      # (core's SecretFilter redaction patterns and its short fake test fixture are
+      # not real key material and do not trip these checks.)
+      - name: Guard — no signing material or secrets in the tree
+        run: |
+          if find . -path ./.git -prune -o -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.p12' -o -name '*.pfx' -o -name '*.key' \) -print | grep -q .; then
+            echo "::error::Keystore/key file found in the repository tree — signing material is never committed (P8 DC-204)."
+            find . -path ./.git -prune -o -type f \( -name '*.jks' -o -name '*.keystore' -o -name '*.p12' -o -name '*.pfx' -o -name '*.key' \) -print
+            exit 1
+          fi
+          if grep -RInE --include='*.kts' --include='*.gradle' --include='*.properties' -e '(storePassword|keyPassword)[[:space:]]*=[[:space:]]*"[^"]+"' . ; then
+            echo "::error::Literal signing password assigned in a Gradle file (P8 DC-204)."
+            exit 1
+          fi
+          if find . -type f -not -path './.git/*' -not -path '*/build/*' -not -path './.github/*' \( -name '*.kt' -o -name '*.kts' -o -name '*.md' -o -name '*.toml' -o -name '*.json' -o -name '*.yml' -o -name '*.yaml' -o -name '*.txt' -o -name '*.properties' \) -print0 \
+            | xargs -0 awk 'FNR==1{prev=0} { if (prev && $0 ~ /^[A-Za-z0-9+\/=]{40,}$/) { print "Possible private-key material in " FILENAME; bad=1 } prev = ($0 ~ /BEGIN [A-Z ]*PRIVATE KEY-----/) } END{ exit bad }'; then
+            echo "Guard passed: no keystore files, literal signing passwords or private-key material in the tree."
+          else
+            echo "::error::Possible private-key material found in the tree (P8 DC-204)."
+            exit 1
+          fi
       - run: gradle --refresh-dependencies :app:assembleDebug :app:testDebugUnitTest :core:testDebugUnitTest :client:testDebugUnitTest :contracts:testDebugUnitTest
       # P7 (TRANSFER-MAP §5.5): coverage gate — :core and :client must stay at or above
       # 90% line coverage; jacocoTestCoverageVerification fails the build below the floor.
@@ -44,3 +68,30 @@ jobs:
           if-no-files-found: ignore
       - name: Verify shared assets are byte-identical (checksums)
         run: cd parity && sha256sum -c assets.sha256
+      # P8 (TRANSFER-MAP §7 P8): release artifacts on every push, built AFTER the
+      # full test suite, the §5.5 coverage gate and the checksum step above have
+      # passed. Release-variant unit tests are not run: the debug-variant suite +
+      # coverage gate already exercises the identical sources (P8 DC-207).
+      # Signing is injected only if the IA_RELEASE_* secrets are ever configured;
+      # today they are absent, the artifacts are UNSIGNED, and the log says so.
+      - name: Build release artifacts (APK + AAB)
+        env:
+          IA_RELEASE_STORE_FILE: ${{ secrets.IA_RELEASE_STORE_FILE }}
+          IA_RELEASE_STORE_PASSWORD: ${{ secrets.IA_RELEASE_STORE_PASSWORD }}
+          IA_RELEASE_KEY_ALIAS: ${{ secrets.IA_RELEASE_KEY_ALIAS }}
+          IA_RELEASE_KEY_PASSWORD: ${{ secrets.IA_RELEASE_KEY_PASSWORD }}
+        run: |
+          if [ -z "$IA_RELEASE_STORE_FILE" ]; then
+            echo "Release signing: NOT configured in CI — the release artifacts from this run are UNSIGNED. Signing is a local owner step (P8 runbook, P8-PORT-NOTES DC-204)."
+          else
+            echo "Release signing: configured via injected secrets."
+          fi
+          gradle :app:assembleRelease :app:bundleRelease
+      - name: Upload release artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: app-release
+          path: |
+            app/build/outputs/apk/release/*.apk
+            app/build/outputs/bundle/release/*.aab
+          if-no-files-found: error
