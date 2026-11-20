@@ -288,3 +288,260 @@ silently disabled gate, which this project does not accept as green.
 coverageExecData in both :core and :client now includes both
 candidate paths. The gate counts as enforced only when the CI log
 shows the verification tasks EXECUTED.
+
+## 10. P7 coverage closure round
+
+CI run #336 was the first run in which the JaCoCo verification tasks
+genuinely EXECUTED (after DC-197/DC-198), and both modules failed the
+§5.5 floor: `:core` ≈ 0.89 line coverage, `:client` ≈ 0.49, against the
+0.90 minimum in each module's `build.gradle.kts`. All 1002 tests passed;
+the gap was coverage depth, not correctness. This round closes it with
+TESTS ONLY: no production file was modified, the 0.90 floor was not
+lowered, no class or package was excluded from coverage, and no
+existing test's expected value was changed. Every new assertion pins
+behaviour read from the C# counterpart in `windows-reference/` first.
+
+### Tests added — `:client` (+94 @Test; module total 38 → 132)
+
+Five new files under `client/src/test/java/com/interviewassistant/client/`,
+using in-process fake transports at the module's existing seams (no real
+sockets):
+
+- **BackendClientTests.kt (25)** — BackendClient.kt previously had ZERO
+  direct tests. Pins: config/plans are unauthenticated (the token
+  provider is never consulted); `X-Client-Version` and a per-request
+  32-hex correlation id on every call; base-URL trailing-slash
+  normalisation; every account/device/document/session endpoint's
+  method, path, request body and DTO decoding (including DTO defaults);
+  deleteAccount's 204/empty body → null; the 401 rule — retried exactly
+  once with a forced token refresh and a fresh correlation id, never on
+  unauthenticated endpoints, never twice; the signed-out short-circuit
+  (BackendException 401/`signed_out`/"Please sign in." with zero HTTP
+  calls); `accessTokenAsync` force-flag delegation; ApiError body
+  parsing with the `http_<status>` fallback for malformed bodies;
+  IOException → offline (status 0, transport message as the code);
+  timeout → 504; an undecodable 200 body throwing rather than being
+  wrapped; `webSocketUri` (https→wss / http→ws, language replacing the
+  query, blank language keeping the resolved query); `BackendClient.Json`
+  being the shared ContractJson instance; and the SSE parser — deltas in
+  order, empty/missing deltas skipped, comment lines ignored, `[DONE]`,
+  an `error` event → `ai_interrupted` 502, blank line clearing the
+  event name, EOF without `[DONE]` → `stream_truncated` 502, non-2xx →
+  ApiError, stream-open 401 retry, and `nextDelta` staying null after
+  `[DONE]`.
+- **CloudSessionTests.kt (17)** — CloudSession.kt previously had ZERO
+  direct tests. Pins: start-response mapping and the idempotency-key /
+  relay request body; heartbeat-interval clamping to 5..120 s; the start
+  retry rule (503/502/status-0 retried with the SAME idempotency key;
+  a `maintenance` 503 and a 402 are NOT retried; at most 3 attempts);
+  relayEndpoint/relayHeaders; `nextConnectionCredentialAsync` consuming
+  the refresh flag exactly once and returning null (with no token fetch)
+  once the lease has ended; heartbeat metering (-1 sentinels keep the
+  previous values, RemainingChanged events, sequence numbers from 1);
+  the minutes-left warning firing only for remaining in 1..300 with the
+  `remaining/60 + 1` minute text; server-end handling (endReason,
+  default "ended", Ended fired exactly once, later heartbeats no-ops);
+  404/409/403 ending the lease with the server's error code; other
+  failures counting to the `svc_unstable` warning at 3 with success
+  resetting the count; stop semantics (server notified once, ends as
+  "stopped", second stop a no-op, a failing stop call swallowed, no stop
+  call for a server-ended lease, disposeAsync = stop).
+- **CloudAnswerProviderTests.kt (16)** — CloudAnswerProvider.kt
+  previously had ZERO direct tests. Pins: purpose resolution (auto with
+  a live session → live, carrying sessionId/deviceId; auto without →
+  manual; live; manual never consulting the session lambda; prep sending
+  prepJobId and no session); an empty stream still recording its purpose;
+  the `no_active_session` fallback to manual exactly once, for auto+live
+  only (no fallback for live/manual purposes or other error codes; a
+  fallback failure mapped from the second error); a mid-stream error
+  event → ServiceUnavailable after earlier deltas were emitted; a
+  truncated stream → ServiceUnavailable; caller cancellation →
+  ProviderException(Cancelled); and the full `map()` taxonomy — all 28
+  named codes plus the 14 status fallbacks, with code, correlationId,
+  message and cause carried through.
+- **AuthEdgeTests.kt (22)** — the branches CloudAuthTests did not reach.
+  Pins: the interactive OAuth flow (authorize URL for the chosen
+  provider; default = first configured provider; code exchanged);
+  provider matching case-insensitively with URL escaping; magic-link
+  failure parsing and the PKCE request fields; malformed token responses
+  (JSON null → "Empty token response.", garbage → "Unexpected
+  response…", empty tokens → "Incomplete token response.", a missing
+  user → empty id/email; all `bad_response`); the 60-second expiry floor
+  with longer expiries honoured; forced refresh bypassing the freshness
+  window and publishing SessionChanged; refresh with config not loaded
+  returning the stale token with zero network calls; a non-sign-out
+  refresh failure rethrowing and keeping the session; `user_banned` →
+  signedOutReason "disabled" and a bare `http_400` refresh failure →
+  "expired"; sign-out (logout call with the Bearer token, store and
+  session cleared, reason "user", offline sign-out still clearing, a
+  signed-out sign-out making no request but still publishing);
+  updatePassword signed-out/failure; sign-up failure; `fail()` parsing
+  precedence (error_code over error, msg over error_description,
+  non-string fields and non-JSON bodies falling back to `http_<status>`);
+  a removed SessionChanged listener not being called; and the token
+  store (missing file → null, nested-directory creation, clear
+  tolerating absence).
+- **ClientPrimitivesTests.kt (14)** — Pkce.kt, OAuthRedirect.kt,
+  CloudOptions.kt, InstallationIdentity.kt, TimeProvider.kt. Pins: PKCE
+  verifier length window 43..128 and alphabet; base64url vectors
+  (`+/8=` → `-_8`, padding stripped); verifier/state shapes (64/32
+  chars); UriEscape escape/unescape rules (unreserved set untouched,
+  uppercase UTF-8 hex, `+` literal on decode, invalid/truncated `%`
+  sequences passed through); RedirectUriParser.parseQuery (first value
+  wins, `+` → space, `a=b=c`); the evaluate decision table (trailing
+  slash trimmed, wrong path/state/unparseable → NotOurs,
+  error_description precedence, an empty error_description not shadowing
+  a code, MissingCode); browserMessageKey values; the CloudOptions
+  authReady/isConfigured matrices (https or loopback only, key
+  required); fromJson full/defaults/malformed-throws; InstallationIdentity
+  (validity window 12..64 plus alphabet, a valid stored id reused
+  untouched, invalid content regenerated as `inst-` + 32 hex); and
+  TimeProvider.System (UTC now, default delay completing).
+
+### Tests added — `:core` (+37 @Test; module total 346 → 383)
+
+Three new files. The diagnostics and domain packages had no dedicated
+test directories; both are pure logic the C# test suite exercises
+indirectly at best.
+
+- **core/diagnostics/DiagnosticsTests.kt (13)** — SessionMetrics
+  (counters independent; totalSuppressed = exactly the 8 suppression
+  counters; the suppression map's keys in the C#'s order; the bounded
+  sample history keeping the newest entries; the cost-estimate formula;
+  percentiles: empty/all-negative → -1, negatives filtered, index
+  clamped), LatencySample fields, ExponentialBackoff (doubling inside
+  the ±15% jitter bands, the 30 s cap, reset, custom initial/max),
+  ManualClock/SystemClock monotonicity, and InstallLayout edges (the
+  port's forward-slash joins asserted exactly — Path.Combine semantics
+  producing a mixed-separator path; CURRENT matched case-insensitively;
+  no-current-folder → false; a drive-root install checking exactly
+  `C:\Update.exe`).
+- **core/domain/DomainModelTests.kt (10)** — ProfileFact.setConfirmed
+  transitions and timestamps (re-confirming keeps the original time;
+  un-confirming a non-confirmed fact is a no-op); the review-state
+  matrix by FactStatus; FactStats.of (reviewable-only totals, the
+  profile-answer split); CandidateProfileRecord confirmedFacts /
+  pendingReviewCount / confirmAll with and without a filter;
+  PersonalCategories (21 entries, unique keys, the boundary flags on
+  avoid_topic/disallowed_claim, find returning null); InterviewTarget
+  .displayName; and ProfileMigration (a current profile untouched and
+  reporting false; provenance gain → ResumeImport plus the document's
+  file name; timestamp backfill from the profile's created/updated
+  stamps; known sources never rewritten; a missing document keeping the
+  existing sourceName; duplicate document ids → first name wins; a
+  second migrate returning false).
+- **core/domain/ProfileServiceTests.kt (14)** — createDocument (file-name
+  sanitising `..\evil:name?.txt` → `evil_name_.txt`; an injection line
+  removed and flagged; SHA-256 taken over the RAW unsanitised text);
+  upload outcomes (empty → "File is empty.", bad PDF, unsupported type,
+  binary text, scanner block, good TXT); addResume (document attached,
+  migration run to schema 2, facts stamped ResumeImport); addManualFact
+  (trimming, sourceName "Added by you" vs "Interview profile questions",
+  confirmed default, metrics extracted); editFact (metrics recomputed,
+  null fields untouched, un-confirm on edit); deleteFact (plus story
+  rebuild, unknown id → false); setPersonal (create/edit/remove, the
+  boundary kind, unknown category throwing "Unknown category", 600-char
+  truncation); rebuildStories (only confirmed Achievement/Project facts;
+  situation framing only with a company; topics/questionTypes);
+  storyTopics; toEngineProfile's truth boundary (only confirmed facts;
+  verified numbers including the metric and digit-only forms and period
+  years; the experience total; entities excluding an unconfirmed fact's
+  company); yearsOfExperience ignoring unconfirmed roles; the personal /
+  boundary entry filters; and toEngineStory's field mapping.
+
+### Local verification (not a coverage claim)
+
+The new files were type-checked with the project's own Kotlin 2.0.21
+compiler against the project's dependency versions, and executed on a
+local JVM harness: all 131 new tests pass (94 `:client`, 37 `:core`),
+alongside the pre-existing `:client` tests. Four pre-existing
+CloudAuthTests cases that use a real loopback HTTP server cannot run in
+this sandbox (loopback HttpURLConnection is broken at the VM level —
+proven with a trivial JDK HttpServer round-trip returning -1); they are
+untouched and pass in CI. The coverage RATIOS themselves are not claimed
+here: they are re-measured by the CI JaCoCo verification tasks on the
+next run, which is the only measurement §5.5 accepts.
+
+### DC-199 — CloudAnswerProvider: a failed fallback REQUEST escapes unmapped
+
+Found by this round's tests. In the C#, the `no_active_session`
+fallback's request is lazy: `Open(...)` only creates the enumerator, so
+an HTTP failure on the re-asked question surfaces from the first
+`MoveNextAsync` INSIDE the inner try and is thrown as `Map(ex2)`. The
+Kotlin port's `openAnswerStream` performs the request eagerly, and in
+`CloudAnswerProvider.streamAsync` the fallback `open(...)` call sits
+OUTSIDE the inner try — so a non-2xx answer to the fallback request
+escapes `streamAsync` as a raw `BackendException` instead of the mapped
+`ProviderException` every other failure becomes. Reproduced locally:
+first stream 409 `no_active_session`, fallback request 429
+`ai_rate_limited` → `BackendException: ai_rate_limited` propagates out
+of the flow. The fix is production-side (guard the fallback open with
+the same mapping) and is therefore NOT made by this tests-only round;
+the round's fallback-failure test pins the first-delta failure stage,
+which both implementations map identically. When the fix lands, add the
+non-2xx-at-fallback-open case beside it.
+
+### DC-200 — CloudOptions.isLoopback misses IPv6 loopback (`[::1]`)
+
+Found by this round's tests. .NET's `Uri.IsLoopback` is true for
+`http://[::1]:54321`, so a local Supabase on IPv6 loopback satisfies
+`authReady`/`isConfigured` on Windows. The port compares
+`java.net.URI.getHost()` against `"::1"`, but the JVM returns the host
+WITH brackets (`"[::1]"`), so the comparison never matches and the URL
+is judged non-loopback (verified locally against the JDK directly).
+Production-side fix (strip brackets before comparing, or compare
+against both forms); not made by this tests-only round. The `::1` case
+is recorded here and in a comment in ClientPrimitivesTests; the
+localhost and 127.0.0.1 cases are pinned as passing.
+
+### DC-201 — BackendClient.webSocketUri double-escapes the language query
+
+Found by this round's tests. The C# assigns
+`UriBuilder.Query = "language=" + Uri.EscapeDataString(language)`
+verbatim, yielding e.g. `language=pt%20BR`. The port builds the URI
+with the multi-argument `java.net.URI` constructor, which quotes the
+`%` of the already-escaped value a second time, producing
+`language=pt%2520BR` (verified locally). Language codes in practice are
+simple (`en`, `fa`, …) and need no escaping, so the live impact is
+limited to values containing characters that escape — but the wire
+format diverges from the C# for exactly those. Production-side fix
+(build the query without re-quoting, e.g. via the raw string form);
+not made by this tests-only round. The unescaped-language replacement
+case is pinned in BackendClientTests; the escaped case is recorded
+here for restoration with the fix.
+
+### Still thin after this round (honest)
+
+- `AnswerStreamSession`'s IOException-mid-read branch and
+  `executeAsync`'s response-arriving-after-cancellation branch are
+  reachable in tests only through timing races; the deterministic
+  equivalents (offline mapping, caller cancellation) are pinned instead.
+- `ProtectedFileTokenStore`'s AtomicMoveNotSupported fallback is
+  filesystem-dependent and untestable in a plain JVM suite.
+- `CloudSession`'s background heartbeat LOOP is exercised through
+  `heartbeatOnceAsync` — the same deterministic surface the C#'s own
+  design exposes — rather than by running the timed loop.
+- Whether `:client`'s climb from ≈0.49 and `:core`'s from ≈0.89 clear
+  0.90 is settled only by the CI re-measurement; this round's additions
+  concentrate on the previously zero-coverage files (BackendClient,
+  CloudSession, CloudAnswerProvider, diagnostics, domain), which is
+  where the missing lines were.
+
+### P7 fix round 3 — DC-199/DC-200/DC-201 production fixes
+
+The coverage-closure round found three real port divergences and,
+under its tests-only mandate, registered them without fixing. The
+parent fixes them here, each against the C# evidence:
+- DC-199 (CloudAnswerProvider): the eager fallback openAnswerStream
+  call now sits inside the same try as the first moveNext, so a
+  non-2xx on the re-asked question is mapped exactly as the C#'s
+  lazy open maps it; the close in that catch is null-safe because
+  the open itself may be what threw.
+- DC-200 (CloudOptions.isLoopback): the host is stripped of IPv6
+  brackets before comparison, matching .NET Uri.IsLoopback for
+  http://[::1]:…; pinned by a new assertTrue in ClientPrimitivesTests.
+- DC-201 (BackendClient.webSocketUri): the URI is assembled from
+  the resolved URI's raw authority/path and parsed once, so an
+  already-escaped language query is preserved (pt%20BR) instead of
+  double-escaped (pt%2520BR); the no-language branch now uses
+  rawQuery so an existing query is preserved byte-exactly too.
