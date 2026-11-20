@@ -176,3 +176,14 @@ CI is the first execution check.
 5. **Update end-to-end on a device**: publish a signed newer APK through the release panel,
    confirm the app offers it, the signer check passes for the same key (and fails for a
    differently-signed build), and the installer handoff completes.
+
+### P6 CI fix round 1 (DC-190)
+
+Run #317 on head b6a05db failed at :app:checkDebugAarMetadata before
+any compilation: androidx.browser 1.9.0 requires compileSdk 36 and
+AGP 8.9.1+, while the project is compileSdk 35 / AGP 8.7.3 (the
+P1-chosen stable stack). Upgrading the whole toolchain for a launcher
+library is not justified; androidx.browser is pinned to 1.8.0 instead
+— the release built against SDK 35, with the identical Custom Tabs
+API surface the launcher uses (CustomTabsIntent has been stable since
+1.0). DC-182's dependency record stands with this version correction.
