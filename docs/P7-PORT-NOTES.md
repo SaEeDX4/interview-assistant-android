@@ -545,3 +545,15 @@ parent fixes them here, each against the C# evidence:
   already-escaped language query is preserved (pt%20BR) instead of
   double-escaped (pt%2520BR); the no-language branch now uses
   rawQuery so an existing query is preserved byte-exactly too.
+
+### P7 fix round 4 — the coverage gate must never replay a cached verdict
+
+Run #341 attempt 1 died at plugin resolution (transient plugin-portal
+failure, 15 s, before any code ran — the P3 Maven-outage class).
+Attempt 2 succeeded, but its JaCoCo step reported the :client report
+and verification tasks as FROM-CACHE. A coverage verdict restored
+from cache is not a measurement of the current tree, so the workflow
+now runs the JaCoCo step with --no-build-cache and prints the
+measured LINE counters from both modules' JaCoCo XML reports into
+the CI log on every run. The P7 verification record is written only
+from those printed numbers.
