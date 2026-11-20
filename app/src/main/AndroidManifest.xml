@@ -9,6 +9,11 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MICROPHONE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION" />
 
+    <!-- P6: Google Play Billing (OD-1) and the D12 battery-optimisation exemption flow
+         (the direct ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS intent; P6-PORT-NOTES DC-188). -->
+    <uses-permission android:name="com.android.vending.BILLING" />
+    <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
+
     <application
         android:name=".InterviewAssistantApplication"
         android:allowBackup="true"
