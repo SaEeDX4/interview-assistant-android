@@ -41,10 +41,15 @@ fun lockstepVersionCode(version: String): Int {
 // With none supplied (the normal CI case today) the release build is UNSIGNED and the
 // log line below says so plainly; the owner signs locally per the P8 runbook. No
 // keystore, password or secret is ever committed — CI carries a guard step for this.
-val releaseStoreFilePath = System.getenv("IA_RELEASE_STORE_FILE") ?: findProperty("releaseStoreFile")?.toString()
-val releaseStorePassword = System.getenv("IA_RELEASE_STORE_PASSWORD") ?: findProperty("releaseStorePassword")?.toString()
-val releaseKeyAlias = System.getenv("IA_RELEASE_KEY_ALIAS") ?: findProperty("releaseKeyAlias")?.toString() ?: "interview-assistant"
-val releaseKeyPassword = System.getenv("IA_RELEASE_KEY_PASSWORD") ?: findProperty("releaseKeyPassword")?.toString()
+// DC-208: a variable that is present but EMPTY counts as absent. CI defines the
+// IA_RELEASE_* names from (currently unset) secrets, which yields empty strings,
+// not nulls — without the blank check the build treated "" as an injected
+// keystore path and failed configuration with "Cannot convert '' to a File".
+fun String?.presentOrNull(): String? = this?.takeIf { it.isNotBlank() }
+val releaseStoreFilePath = (System.getenv("IA_RELEASE_STORE_FILE") ?: findProperty("releaseStoreFile")?.toString()).presentOrNull()
+val releaseStorePassword = (System.getenv("IA_RELEASE_STORE_PASSWORD") ?: findProperty("releaseStorePassword")?.toString()).presentOrNull()
+val releaseKeyAlias = (System.getenv("IA_RELEASE_KEY_ALIAS") ?: findProperty("releaseKeyAlias")?.toString()).presentOrNull() ?: "interview-assistant"
+val releaseKeyPassword = (System.getenv("IA_RELEASE_KEY_PASSWORD") ?: findProperty("releaseKeyPassword")?.toString()).presentOrNull()
 val releaseSigningReady = releaseStoreFilePath != null && releaseStorePassword != null && releaseKeyPassword != null
 logger.lifecycle(
     if (releaseSigningReady) {
