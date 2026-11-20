@@ -557,3 +557,25 @@ now runs the JaCoCo step with --no-build-cache and prints the
 measured LINE counters from both modules' JaCoCo XML reports into
 the CI log on every run. The P7 verification record is written only
 from those printed numbers.
+
+## P7 CI VERIFICATION — COMPLETE (2026-11-19)
+
+- Run #343 on head 60a49a1 — SUCCESS. All four JaCoCo tasks EXECUTED
+  fresh (--no-build-cache, fix round 4); measured LINE counters
+  printed in the CI log: :client missed 44 / covered 704 = 94.1%;
+  :core missed 729 / covered 6758 = 90.3% — both at or above the
+  §5.5 floor of 90%, so both jacocoTestCoverageVerification tasks
+  PASSED on genuinely measured data. Checksums 13/13 OK.
+  (Fix-round runs #330–#341 are recorded in DC-197/DC-198 and fix
+  rounds 3–4 above; run #341 attempt 1 was a transient plugin-portal
+  failure, attempt 2 succeeded.)
+- Test totals on current content: :app 607 (executed fresh in run
+  #333 on identical inputs; FROM-CACHE since), :core 383, :client
+  132, :contracts 11 — project total 1,133 tests, all passing.
+- TEST-MAP closure stands: 674/674 Windows methods accounted
+  (120 backend / 495 mirrored / 59 UI-mechanics-only), 0 unaccounted;
+  80/80 fixtures consumed; soak mirror verified in the suite.
+- §5.5 gate items still open, stated plainly: Backend.Tests re-run
+  (DC-192, environment-blocked — no dotnet SDK/PostgreSQL here) and
+  the Compose semantics-tree accessibility assertions (DC-195,
+  device/emulator-pending). Neither is claimed done.
