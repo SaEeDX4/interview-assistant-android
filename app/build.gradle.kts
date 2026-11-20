@@ -125,6 +125,11 @@ dependencies {
     implementation(libs.androidx.core.ktx)
     implementation(libs.androidx.lifecycle.runtime.ktx)
     implementation(libs.androidx.activity.compose)
+    // P8 fix round 3 (P8-PORT-NOTES DC-210): lintVitalRelease requires the
+    // Fragment library at >= 1.3.0 wherever the Activity Result APIs are used;
+    // nothing else in the graph brings androidx.fragment in, so it is declared
+    // explicitly (real dependency, no lint suppression or baseline).
+    implementation(libs.androidx.fragment.ktx)
     implementation(platform(libs.androidx.compose.bom))
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
