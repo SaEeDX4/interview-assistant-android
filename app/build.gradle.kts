@@ -94,15 +94,6 @@ android {
             }
         }
     }
-    sourceSets {
-        // P8 (P8-PORT-NOTES DC-205): the release variant carries the third-party
-        // licence notices as assets/THIRD_PARTY_NOTICES.md, generated from the
-        // single source of truth at parity/THIRD_PARTY_NOTICES.md by the
-        // copyThirdPartyNotices task below (closes the packaging half of DC-193).
-        getByName("release") {
-            assets.srcDir(layout.buildDirectory.dir("generated/thirdPartyNotices"))
-        }
-    }
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
@@ -153,6 +144,17 @@ val copyThirdPartyNotices = tasks.register<Copy>("copyThirdPartyNotices") {
     into(layout.buildDirectory.dir("generated/thirdPartyNotices"))
 }
 
-tasks.matching { it.name == "mergeReleaseAssets" }.configureEach {
-    dependsOn(copyThirdPartyNotices)
+// DC-209: the generated notices directory reaches the release variant through
+// the AGP variant API, which wires BOTH the task dependency and the input
+// producer link. The first attempt (a plain sourceSets assets.srcDir plus a
+// tasks.matching dependsOn on mergeReleaseAssets) failed Gradle's task
+// validation in CI (run #350): "Property has implicit dependency" on
+// :app:copyThirdPartyNotices — a dependsOn alone does not declare the
+// input/output producer relationship the validator requires.
+extensions.configure<com.android.build.api.variant.ApplicationAndroidComponentsExtension> {
+    onVariants(selector().withBuildType("release")) { variant ->
+        variant.sources.assets?.addGeneratedSourceDirectory(copyThirdPartyNotices) { task ->
+            objects.directoryProperty().fileValue(task.destinationDir)
+        }
+    }
 }
