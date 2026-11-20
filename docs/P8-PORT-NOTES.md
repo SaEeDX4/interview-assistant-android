@@ -338,3 +338,26 @@ through the AGP variant API (sources.assets
 addGeneratedSourceDirectory), which wires both. The Copy task and
 its single source of truth (parity/THIRD_PARTY_NOTICES.md) are
 unchanged.
+
+### P8 CI fix round 3 (DC-210)
+
+Run #352: DC-209 held — the release APK and AAB were built and
+packaged (:app:packageRelease, :app:bundleRelease and
+:app:signReleaseBundle all ran) — but :app:lintVitalRelease failed
+with 5 errors, all the same check
+(InvalidFragmentVersionForActivityResult from androidx.activity) at
+the five registerForActivityResult call sites in MainActivity.kt
+(lines 131/135/141/146/148, read verbatim from the log). The check
+requires the Fragment library at >= 1.3.0 wherever the Activity
+Result APIs are used; nothing in the dependency graph brought
+androidx.fragment in at all (activity-compose does not carry it),
+and the debug variant never runs lintVital — which is why this
+surfaced only when the release build was first exercised in P8.
+Fix: androidx.fragment:fragment-ktx 1.8.5 is declared explicitly in
+the catalog and as an :app implementation dependency — a real
+dependency satisfying the rule as written; no lint suppression, no
+baseline, no abortOnError change. The licence inventory gained the
+matching row (the two-direction LicenseComplianceTests pin catalog
+<-> notices). An earlier checker report for this run quoted plugin
+versions that exist nowhere in this project (AGP 8.13.2 / Kotlin
+2.2.21); it was set aside and the log re-read verbatim before acting.
