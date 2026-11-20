@@ -6,10 +6,13 @@ import android.app.PictureInPictureParams
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.media.projection.MediaProjectionManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
+import android.os.PowerManager
+import android.provider.Settings
 import android.view.InputDevice
 import android.view.KeyEvent
 import android.view.WindowManager
@@ -21,12 +24,15 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
 import androidx.lifecycle.lifecycleScope
+import com.interviewassistant.app.platform.BatteryExemption
+import com.interviewassistant.app.platform.CustomTabsUrlLauncher
 import com.interviewassistant.app.platform.FocusPlatform
 import com.interviewassistant.app.platform.FocusRestoreRecord
 import com.interviewassistant.app.platform.LiveFocusRequests
 import com.interviewassistant.app.platform.OAuthRedirectBus
 import com.interviewassistant.app.platform.ShortcutAction
 import com.interviewassistant.app.platform.ShortcutService
+import com.interviewassistant.app.services.CloudService
 import com.interviewassistant.app.ui.components.AppDialog
 import com.interviewassistant.app.ui.components.DialogController
 import com.interviewassistant.app.ui.components.ToastController
@@ -76,15 +82,22 @@ import kotlinx.coroutines.launch
  * factory is gone); its ApplySettings callback is the one point the C#'s SettingsApplied event
  * fans out from, so the pre-interview re-check subscribes there (DC-152, DC-160). The Live view
  * model's notifications and authorized-use confirmation bind to the Live destination's own hosts.
- * The composition's capture/update providers still land in P5/P6; until then the lazy
- * construction fails with their explicit IllegalStateException instead of any fake behavior
- * (DC-91).
+ * (At P4-G the composition's capture/update providers were still the DC-91 throwing stand-ins;
+ * P5 landed capture and P6 updates — DC-91 is fully resolved, DC-189.)
  *
  * P5: the activity owns the platform launchers and window acts the live-audio phase needs —
  * the RECORD_AUDIO / POST_NOTIFICATIONS permission flows and the MediaProjection consent for
  * the capture service (which asks only at a start, never at app start), the D2 hardware-keyboard
  * shortcut dispatch, the Interview Focus PiP handlers behind [FocusPlatform] (D9), and
  * keep-screen-on while a session is active (the D8 substitute's second half).
+ *
+ * P6: the activity hosts the billing & account-completion platform acts — it installs the
+ * Custom Tabs launcher behind `CloudService.openExternal` (the Paddle checkout/portal path,
+ * DC-186), starts the Play Billing coordinator and provides its purchase-flow activity
+ * (OD-1; the launch entry is [launchPlayBillingUpgrade], DC-187), and owns the D12
+ * battery-optimisation exemption prompt, asked once when a session first becomes active
+ * (DC-188). The composition's update provider is real now (DC-189), so the lazy view-model
+ * construction no longer throws.
  */
 class MainActivity : ComponentActivity() {
 
@@ -170,6 +183,7 @@ class MainActivity : ComponentActivity() {
             else -> Destination.Live
         }
         installLiveAudioWiring()
+        installBillingWiring()
         if (intent?.getBooleanExtra(EXTRA_FOCUS_MANUAL, false) == true) {
             destination = Destination.Live
             mainHandler.post { LiveFocusRequests.requestManualInput() }
@@ -221,6 +235,7 @@ class MainActivity : ComponentActivity() {
         ShortcutService.windowHandler = null
         FocusPlatform.applyHandler = null
         FocusPlatform.restoreHandler = null
+        composition.playBillingClient.activityProvider = null
         super.onDestroy()
     }
 
@@ -264,11 +279,47 @@ class MainActivity : ComponentActivity() {
         ShortcutService.windowHandler = { action -> onShortcutWindowAction(action) }
         viewModel.addPropertyChangedListener { name ->
             if (name == "isListening" || name == "isPaused") {
-                mainHandler.post { updateKeepScreenOn() }
+                mainHandler.post {
+                    updateKeepScreenOn()
+                    // D12: a session starting is the honest point to ask for the battery
+                    // exemption (once per process, only when missing — BatteryExemption decides).
+                    if (viewModel.sessionActive) BatteryExemption.requestIfNeeded()
+                }
             }
         }
         updateKeepScreenOn()
     }
+
+    /**
+     * The P6 wiring this activity owns: the Custom Tabs launcher behind every gated external
+     * open (Paddle checkout/portal, legal pages — the gate itself stays in CloudService), the
+     * Play Billing coordinator's start (connect + restore + product query) and its purchase
+     * flow's activity, and the battery-exemption platform halves (probe + system prompt).
+     */
+    private fun installBillingWiring() {
+        CloudService.urlLauncher = { url -> CustomTabsUrlLauncher.open(this, url) }
+        composition.playBillingClient.activityProvider = { this }
+        lifecycleScope.launch { composition.playBilling.start() }
+        val powerManager = getSystemService(PowerManager::class.java)
+        BatteryExemption.probe = { powerManager.isIgnoringBatteryOptimizations(packageName) }
+        BatteryExemption.requester = {
+            startActivity(
+                Intent(
+                    Settings.ACTION_REQUEST_IGNORE_BATTERY_OPTIMIZATIONS,
+                    Uri.parse("package:$packageName"),
+                ),
+            )
+        }
+    }
+
+    /**
+     * The Account Upgrade action's Play Billing entry (OD-1): launches the Pro purchase flow
+     * through the composition's coordinator. Hosted here because the flow needs this
+     * activity; the account layer's verified dispatch (Paddle + poll) is unchanged in P6 —
+     * see P6-PORT-NOTES DC-187 for the boundary and the reroute that lands with the
+     * server-side Play bridge.
+     */
+    fun launchPlayBillingUpgrade(): Boolean = composition.playBilling.launchPurchase()
 
     private fun launchProjectionConsent() {
         val manager = getSystemService(MediaProjectionManager::class.java)

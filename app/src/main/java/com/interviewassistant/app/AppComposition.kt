@@ -8,8 +8,12 @@ import com.interviewassistant.app.platform.AndroidNetworkAvailability
 import com.interviewassistant.app.platform.AndroidProcessStats
 import com.interviewassistant.app.platform.ShortcutAction
 import com.interviewassistant.app.platform.ShortcutService
+import com.interviewassistant.app.platform.UpdateService
 import com.interviewassistant.app.platform.audio.AudioCaptureService
+import com.interviewassistant.app.platform.billing.BillingCoordinator
+import com.interviewassistant.app.platform.billing.PlayBillingClient
 import com.interviewassistant.app.services.AppSettings
+import com.interviewassistant.app.services.BuildInfo
 import com.interviewassistant.app.services.CloudService
 import com.interviewassistant.app.services.IAudioCaptureService
 import com.interviewassistant.app.services.IUpdateService
@@ -24,9 +28,11 @@ import kotlinx.coroutines.SupervisorJob
  * view model — with the platform seams injected.
  *
  * The view model is built lazily. Its capture dependency is the real P5 platform service
- * ([audioCaptureService]); its update dependency is the P6 platform service, supplied until then by
- * a provider that throws a clear [IllegalStateException] (P4-PORT-NOTES DC-91) — nothing fakes it.
- * Settings, cloud and the workspace factory are fully live.
+ * ([audioCaptureService]) and its update dependency is the real P6 platform service
+ * ([updateService]) — P4-PORT-NOTES DC-91 is fully resolved (P6-PORT-NOTES DC-189), so the
+ * app is constructible end-to-end. Settings, cloud and the workspace factory are fully live.
+ * The composition also owns the Play Billing pair (OD-1): the gateway ([playBillingClient])
+ * and its coordinator ([playBilling]), started by the hosting activity.
  *
  * The composition also installs the process-wide half of the D2 shortcut surface
  * ([ShortcutService]): the view-model actions execute the main view model's commands (the
@@ -48,12 +54,27 @@ class AppComposition(context: Context) {
     /** The P5 audio capture service (the C#'s `new AudioCaptureService()`), built once. */
     val audioCaptureService: AudioCaptureService by lazy { AudioCaptureService(appContext) }
 
+    /**
+     * The P6 update service (the C#'s `new UpdateService(Settings, Cloud.Options.UpdateUrl)`):
+     * the feed is the cloud options' update URL — the bundled cloud.json points it at the
+     * project's release manifest (P6-PORT-NOTES DC-183).
+     */
+    val updateService: UpdateService by lazy {
+        UpdateService(appContext, settings, cloud.options.updateUrl, BuildInfo.version)
+    }
+
+    /** The Play Billing gateway (OD-1); its activity provider is installed by MainActivity. */
+    val playBillingClient: PlayBillingClient by lazy { PlayBillingClient(appContext) }
+
+    /** The Play Billing coordinator: connect/restore/query/launch state for the account layer. */
+    val playBilling: BillingCoordinator by lazy { BillingCoordinator(playBillingClient, scope) }
+
     /** The main view model; first access constructs it (see the class doc for why it is lazy). */
     val mainViewModel: MainViewModel by lazy {
         MainViewModel(
             settings = settings,
             cloud = cloud,
-            updates = updateService(),
+            updates = updateService,
             capture = captureService(),
             scope = scope,
             postToUi = { action -> mainHandler.post { action() } },
@@ -85,8 +106,6 @@ class AppComposition(context: Context) {
 
     private fun captureService(): IAudioCaptureService = audioCaptureService
 
-    private fun updateService(): IUpdateService =
-        throw IllegalStateException(
-            "Updates are not available yet: the IUpdateService platform implementation lands in P6.",
-        )
+    // The update provider is the [updateService] property itself (P6, DC-189) — no
+    // indirection remains: MainViewModel receives the real service above.
 }
