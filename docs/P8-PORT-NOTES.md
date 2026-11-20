@@ -322,3 +322,19 @@ through a presentOrNull() blank check (a present-but-empty value
 counts as absent), and the alias falls back to "interview-assistant"
 when blank. No signing behaviour changes when real values are
 injected.
+
+### P8 CI fix round 2 (DC-209)
+
+Run #350: signing configuration now passes (DC-208 held), but
+:app:copyThirdPartyNotices failed Gradle's task validation —
+"Property has implicit dependency" (the path quoted in the first
+checker's report did not exist anywhere in the build; the verbatim
+log lines were re-read before acting). Root cause: wiring the
+generated directory in as a plain sourceSets assets.srcDir plus a
+tasks.matching dependsOn on mergeReleaseAssets declares a task
+dependency but not the input/output producer relationship Gradle's
+validator requires. The directory now reaches the release variant
+through the AGP variant API (sources.assets
+addGeneratedSourceDirectory), which wires both. The Copy task and
+its single source of truth (parity/THIRD_PARTY_NOTICES.md) are
+unchanged.
