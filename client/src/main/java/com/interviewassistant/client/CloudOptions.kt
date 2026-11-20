@@ -80,7 +80,9 @@ class CloudOptions {
 
         /** `Uri.IsLoopback`: localhost, 127.0.0.0/8 or ::1. */
         private fun isLoopback(uri: URI): Boolean {
-            val host = uri.host?.lowercase() ?: return false
+            // DC-200 fix: java.net.URI.getHost() keeps the brackets of an IPv6 literal
+            // ("[::1]"), .NET's Uri.IsLoopback sees "::1" — strip the brackets first.
+            val host = uri.host?.lowercase()?.trim('[', ']') ?: return false
             return host == "localhost" || host == "::1" || host.startsWith("127.")
         }
     }

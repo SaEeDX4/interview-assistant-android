@@ -100,8 +100,13 @@ class BackendClient(
         val baseUri = URI(baseUrl)
         val resolved = baseUri.resolve(relativePath)
         val scheme = if (baseUri.scheme == "https") "wss" else "ws"
-        val query = if (!language.isNullOrBlank()) "language=" + UriEscape.escapeDataString(language) else resolved.query
-        return URI(scheme, resolved.userInfo, resolved.host, resolved.port, resolved.path, query, null)
+        val query = if (!language.isNullOrBlank()) "language=" + UriEscape.escapeDataString(language) else resolved.rawQuery
+        // DC-201 fix: the multi-arg URI constructor re-quotes the query (a literal % becomes
+        // %25), double-escaping the already-escaped language. .NET's UriBuilder preserves
+        // valid %XX sequences, so assemble from the raw components and parse once instead.
+        val sb = StringBuilder().append(scheme).append("://").append(resolved.rawAuthority).append(resolved.rawPath)
+        if (query != null) sb.append('?').append(query)
+        return URI(sb.toString())
     }
 
     // ---- public ----

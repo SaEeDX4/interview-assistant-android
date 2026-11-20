@@ -60,11 +60,15 @@ class CloudAnswerProvider(
                 // The lease ended between our check and the request (pause, timeout): answer as a typed question instead.
                 stream?.close()
                 resolvedPurpose = AnswerPurposes.Manual
-                stream = open(resolvedPurpose, null, body, maxTokens)
+                // DC-199 fix: the C#'s fallback open is lazy, so a non-2xx on the re-asked
+                // question surfaces inside its inner try and is mapped. The port's open is
+                // eager, so it must sit inside the same try for the mapping to be faithful.
+                stream = null
                 try {
+                    stream = open(resolvedPurpose, null, body, maxTokens)
                     first = moveNext(stream)
                 } catch (ex2: BackendException) {
-                    stream.close()
+                    stream?.close()
                     throw map(ex2)
                 }
             } else {
