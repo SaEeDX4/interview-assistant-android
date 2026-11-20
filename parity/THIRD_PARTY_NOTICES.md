@@ -13,6 +13,7 @@ missing here (or an entry here names no real dependency).
 |---|---|---|
 | `androidx.core:core-ktx` | 1.15.0 | Apache License 2.0 |
 | `androidx.activity:activity-compose` | 1.9.3 | Apache License 2.0 |
+| `androidx.fragment:fragment-ktx` | 1.8.5 | Apache License 2.0 |
 | `androidx.compose:compose-bom` | 2024.12.01 | Apache License 2.0 |
 | `androidx.compose.ui:ui` | (Compose BOM 2024.12.01) | Apache License 2.0 |
 | `androidx.compose.ui:ui-graphics` | (Compose BOM 2024.12.01) | Apache License 2.0 |
