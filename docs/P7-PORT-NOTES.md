@@ -274,3 +274,17 @@ serialization accessors, whose instrumented forms then fail to load
 in the test JVM. The JaCoCo default (false) exists precisely to
 exclude such classes. Both :core and :client build files now set it
 to false explicitly. No test, target or threshold was changed.
+
+### P7 CI fix round 2 (DC-198)
+
+Run #333 on head d1bdf64 was SUCCESS for the test suite, but the four
+JaCoCo tasks were SKIPPED ("40 up-to-date"): the coverageExecData
+fileTree pointed only at AGP's managed-coverage path
+(outputs/unit_test_code_coverage/...), while the Gradle jacoco
+plugin writes the Test task's exec data to jacoco/testDebugUnitTest
+.exec. With an empty executionData set, both JacocoReport and
+JacocoCoverageVerification skip themselves (@SkipWhenEmpty) — a
+silently disabled gate, which this project does not accept as green.
+coverageExecData in both :core and :client now includes both
+candidate paths. The gate counts as enforced only when the CI log
+shows the verification tasks EXECUTED.
