@@ -308,3 +308,17 @@ line; any failure stops publication.
   DC-196 (`pf_title`, Windows lockstep fix).
 - The SYNC-LOG entry for P8 is written when the release is actually
   published, naming the mirrored Windows commit — not before.
+
+### P8 CI fix round 1 (DC-208)
+
+Run #348: the guard, tests, coverage and checksum steps all passed,
+but the release step failed while configuring :app — "Cannot convert
+'' to a File" at the signing config. Root cause: CI defines the
+IA_RELEASE_* environment names from currently-unset secrets, which
+produces EMPTY STRINGS, not absent variables; the readiness check
+tested only for null, so "" was treated as an injected keystore path
+(and the alias log printed ''). All four injected values now pass
+through a presentOrNull() blank check (a present-but-empty value
+counts as absent), and the alias falls back to "interview-assistant"
+when blank. No signing behaviour changes when real values are
+injected.
