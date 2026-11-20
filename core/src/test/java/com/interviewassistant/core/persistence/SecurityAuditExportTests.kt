@@ -116,6 +116,20 @@ class SecurityAuditExportTests {
 
     // ------------------------------------------------------------------ L9 / L10
 
+    /**
+     * Ported standalone in P7 (TEST-MAP closure): the same input and assertion also appear as
+     * a case inside [malformedBackup_IsRejectedAsInvalid_NeverAnUnhandledException] above; the
+     * C# keeps it as its own method (`EntryNamesWithATrailingNewline_AreRejected`), so the
+     * mirror does too. The id/entry regexes end with \z ("$" would accept a trailing "\n").
+     */
+    @Test
+    fun entryNamesWithATrailingNewline_AreRejected() {
+        val ex = assertThrows(ProfileBundleException::class.java) {
+            ProfileBundle.read(ByteArrayInputStream(profileOnly("{\"Id\":\"abc\\n\"}")))
+        }
+        assertEquals(ProfileBundleError.Invalid, ex.error)
+    }
+
     @Test
     fun importMemory_IsBounded() {
         assertTrue(ProfileBundleLimits.Default.maxTotalBytes <= (64L shl 20))
