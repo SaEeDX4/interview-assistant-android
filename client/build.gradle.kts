@@ -44,7 +44,7 @@ jacoco {
 
 tasks.withType<Test>().configureEach {
     extensions.configure<JacocoTaskExtension> {
-        isIncludeNoLocationClasses = true
+        isIncludeNoLocationClasses = false
     }
 }
 
