@@ -7,6 +7,7 @@ import com.interviewassistant.app.services.AppLog
 import com.interviewassistant.app.services.AppPaths
 import com.interviewassistant.app.services.Branding
 import com.interviewassistant.app.services.BuildInfo
+import com.interviewassistant.app.services.extractBundledCloudJson
 import com.interviewassistant.app.services.extractBundledKnowledge
 
 /**
@@ -34,6 +35,7 @@ class InterviewAssistantApplication : Application() {
         AppPaths.install(this)
         installExceptionLogging()
         BuildInfo.install(this)
+        extractBundledCloudJson(this)
         extractBundledKnowledge(this)
         Branding.load(AppPaths.baseDirectory)
         AppLog.info("${Branding.productName} ${BuildInfo.summary} starting on Android ${Build.VERSION.RELEASE}")
