@@ -390,3 +390,49 @@ claimed here: signing + publication through the release panel and
 Play (runbook §5.1/§5.2, incl. OD-3), and the device smoke test
 (§5.3). SYNC-LOG Sync #8 records this state and names the mirrored
 Windows commit; it does not claim publication.
+
+### P8 fix round 4 (DC-211) — found by the owner's heavy re-review
+
+After P8 closed, the owner ordered a separate heavy re-verification.
+Inspecting the actual downloaded CI artifact (run #358) instead of
+build logs proved that assets/THIRD_PARTY_NOTICES.md was NOT in the
+release APK or the AAB: the DC-209 variant-API wiring, although the
+CI build was green, silently did not deliver the file. CI-green is
+not artifact-true; this is recorded as the round's main lesson.
+Fix: the generation machinery (Copy task + variant-API wiring) is
+removed; the notices now ship as a STATIC asset of the release
+source set (app/src/release/assets/THIRD_PARTY_NOTICES.md) merged by
+AGP's standard source-set mechanism, and a new JVM test
+(LicenseComplianceTests
+releaseAssetNoticesMatchTheParitySourceByteForByte) pins the shipped
+copy byte-identical to the parity source of truth. The corrected
+artifact must again be verified by inspection after CI — the claim
+is not made from the build log.
+
+## Post-P8 independent review (2026-11-25, owner-ordered)
+
+A fresh reviewer (not the builder) re-derived the "100% copy" claim
+from the files: Windows src enumerated at exactly 204 files and the
+map's 204 rows match in both directions (Shared 49 / Mirror 101 /
+Platform 45 / Not-Needed 9); Windows test methods recounted at 674
+(554 + 120) and TEST-MAP dispositions at 120/495/59 with 0
+unaccounted; Kotlin @Test recounted at exactly 1,133; all 80
+fixtures byte-identical by SHA-256; 10 behaviour spot-checks (answer
+rules, Coach limits, settle timings, heartbeat clamp, caps,
+bank-cap-with-no-floor, FontPreset sizes, plan minutes, the Live
+prompt literal at 2,358 chars on both sides, i18n) all identical;
+the DC register DC-2…DC-210 has no gaps and no unregistered
+difference was found (pf_title/DC-196 re-verified on both sides).
+Four LOW documentation drifts were found and fixed the same day:
+(1) docs/TRANSFER-MAP.md was stale by the §5.4 correction — docs
+copy refreshed; (2) README still cited "356 InlineData" — corrected
+to the mechanical 612 (DC-191); (3) DECISIONS.md OD-3 was stale —
+updated to the resolved/pending state; (4) §2 target paths drifted
+for 27 :app rows (P1 predictions vs the P4 layout; 8 moved, 19
+consolidated, functionality verified present) — a dated errata
+appendix was added to TRANSFER-MAP.md rather than rewriting the
+original table. The review's UNVERIFIED list stands as the honest
+boundary: it did not execute CI, and device behaviour remains
+device-pending. Separately, this review round is what caught DC-211
+(the notices missing from the shipped artifact) — by inspecting the
+downloaded artifact, not the logs.
