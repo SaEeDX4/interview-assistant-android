@@ -115,4 +115,23 @@ class LicenseComplianceTests {
         assertTrue("parity/THIRD_PARTY_NOTICES.md is missing", file.isFile)
         assertTrue("the notices are too short to be substantive", file.readText().trim().length > 200)
     }
+
+    @Test
+    fun releaseAssetNoticesMatchTheParitySourceByteForByte() {
+        // DC-211: the release source set carries the notices as a static asset
+        // (app/src/release/assets/THIRD_PARTY_NOTICES.md) so AGP's standard
+        // merge puts them at assets/THIRD_PARTY_NOTICES.md in the APK/AAB.
+        // This test is the drift guard: the shipped copy must equal the single
+        // source of truth byte for byte. (The generated-directory mechanisms
+        // tried first silently produced an APK without the notices — found by
+        // inspecting the downloaded CI artifact, not the build log.)
+        val root = repoRoot() ?: return
+        val source = File(root, "parity/THIRD_PARTY_NOTICES.md")
+        val shipped = File(root, "app/src/release/assets/THIRD_PARTY_NOTICES.md")
+        assertTrue("app/src/release/assets/THIRD_PARTY_NOTICES.md is missing", shipped.isFile)
+        assertTrue(
+            "the release asset notices differ from parity/THIRD_PARTY_NOTICES.md",
+            source.readBytes().contentEquals(shipped.readBytes()),
+        )
+    }
 }
