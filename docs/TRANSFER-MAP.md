@@ -603,3 +603,40 @@ Mechanical verification method: every line of `all-src-files.txt` (204 paths) wa
 | Owner decisions (§9) | 4 | OD-1 distribution, OD-2 repo visibility, OD-3 Play signing (conditional), OD-4 same-device capture in v1 |
 
 *End of Transfer Map. Companion documents: `audit-core.md`, `audit-app.md`, `audit-backend-tests.md`, `all-src-files.txt` (all in this folder). The Windows reference remains read-only; this map is the contract for every Android change that follows it.*
+
+> **Correction (2026-11-18, P2):** §5.4 says DTO JSON names are PascalCase. Verified from the Windows source on both sides of the wire (BackendClient JsonSerializerDefaults.Web; backend ConfigureHttpJsonOptions + CamelCase policy): the wire format is **camelCase**, nulls/defaults written. The code wins; this map note is superseded. See P2-PORT-NOTES.md.
+
+---
+
+## Errata — §2 target-path reconciliation (2026-11-25, post-P8 independent review)
+
+The §2 table's target paths were written at P1 planning time. The
+:core, :client and :contracts targets match the built tree exactly
+(0 drift). 27 :app targets were relocated or consolidated during the
+P4 build; the functionality is present in every case (verified by the
+2026-11-25 independent review via symbol search and the P4 package
+records in P4-PORT-NOTES.md). This errata records the drift without
+rewriting the original table:
+
+- Same file, moved (8): platform/AppLog.kt → services/AppLog.kt;
+  platform/AppPaths.kt → services/AppPaths.kt;
+  platform/SecretStore.kt → services/SecretStore.kt;
+  ui/home/AccountPage.kt → ui/account/AccountPage.kt;
+  ui/home/HelpPage.kt → ui/help/HelpPage.kt;
+  ui/home/HomeViewModel.kt → viewmodels/HomeViewModel.kt;
+  ui/live/InterviewFocus.kt → platform/InterviewFocus.kt;
+  auth/AppLinkRedirect.kt → :client OAuthRedirect.kt + app
+  platform/Platform.kt (receiver/bus).
+- Consolidated during P4 into the package files recorded in
+  P4-PORT-NOTES.md (19): platform/WindowPlacement.kt,
+  services/SelfTest.kt, ui/components/Accessible.kt,
+  ui/components/AppDialog.kt (→ components/Dialog.kt),
+  ui/components/Converters.kt, ui/components/ExportDialog.kt,
+  ui/components/FormAssist.kt, ui/components/InfoTip.kt,
+  ui/components/Localization.kt, ui/components/RovingRadios.kt
+  (→ RovingSelection.kt), ui/home/DataExport.kt,
+  ui/home/HomeReadiness.kt, ui/home/account/DeleteAccountDialog.kt,
+  ui/live/LiveChromeLayout.kt, ui/live/LiveViewModel.kt
+  (→ viewmodels/MainViewModel.kt), ui/live/QuickHelpSheet.kt,
+  ui/preinterview/PreInterviewViewModel.kt,
+  ui/settings/SettingsViewModel.kt, ui/theme/Theme.kt + Tokens.kt.
