@@ -174,3 +174,27 @@ private fun copyAssetDir(assets: android.content.res.AssetManager, assetPath: St
         }
     }
 }
+
+/**
+ * Extracts the bundled `cloud.json` asset into [AppPaths.baseDirectory] (DC-212).
+ *
+ * The C# ships cloud.json next to the EXE and `CloudService.LoadOptions` reads
+ * it from there; the Android default reader looks in the same place
+ * (baseDirectory). The knowledge assets got their extraction in P4/P5, but
+ * cloud.json never did — on a real device the file was simply absent, the
+ * options stayed empty and the app reported "service not configured" no
+ * matter what the service did. Found by the owner's device smoke test
+ * (2026-11-25), not by any JVM test: the tests inject their options.
+ * The file is tiny and ships per release channel, so it is rewritten on
+ * every start — an update's channel config always wins, as on Windows.
+ */
+fun extractBundledCloudJson(context: Context) {
+    try {
+        val bytes = context.assets.open("cloud.json").use { it.readBytes() }
+        File(AppPaths.baseDirectory, "cloud.json").writeBytes(bytes)
+    } catch (e: IOException) {
+        AppLog.warn("Bundled cloud.json could not be extracted: " + AppLog.describe(e))
+    } catch (e: SecurityException) {
+        AppLog.warn("Bundled cloud.json could not be extracted: " + AppLog.describe(e))
+    }
+}
