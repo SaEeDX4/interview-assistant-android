@@ -436,3 +436,34 @@ boundary: it did not execute CI, and device behaviour remains
 device-pending. Separately, this review round is what caught DC-211
 (the notices missing from the shipped artifact) — by inspecting the
 downloaded artifact, not the logs.
+
+### P8 fix round 5 (DC-212) — device smoke test finding
+
+The owner's first device install (2026-11-25) opened on "Service not
+configured / This build is not connected to the Interview Assistant
+service". Root cause, found by tracing the real startup path:
+CloudService's default bundled-cloud.json reader reads
+File(AppPaths.baseDirectory, "cloud.json") — the Windows "next to the
+EXE" location — but the P4/P5 platform glue only ever extracted the
+knowledge/ assets there; the shipped assets/cloud.json was never
+extracted, so on a real device LoadOptions found no source, the
+options stayed empty and the state was NotConfigured regardless of
+the service. Every JVM test injected its options, so no test could
+see it — the device gate existed precisely for this class of defect
+and it caught one. Fix (platform layer only, mirrored logic
+untouched): extractBundledCloudJson() in Workspace.kt's platform
+glue copies the asset into baseDirectory on every start (the file
+ships per release channel; rewriting makes an update's channel
+config win, as on Windows), called from
+InterviewAssistantApplication.onCreate next to
+extractBundledKnowledge. A new :app test
+(ShippedCloudConfigTests) pins the shipped asset through the
+mirrored parser to a configured service. Audit of the same pattern:
+Branding.load reads branding.json from the same folder, but that
+file is optional by design on both platforms (absent = defaults)
+and ships in neither — not a defect. Separately verified the same
+day: the shared backend itself is GONE from Railway (the production
+URL returns Railway's 404 "Application not found"), so even with
+this fix the app cannot reach a live service until the backend is
+resurrected — a hosting matter the owner is deciding (his own
+server vs Railway), tracked outside these notes.
