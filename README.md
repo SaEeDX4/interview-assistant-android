@@ -23,7 +23,7 @@ The Android app is built so future Windows upgrades propagate mechanically, in l
   `parity/assets.sha256`.
 - **(B) Mirror** — Windows Core client logic is ported 1:1 to Kotlin with the same module,
   file and type names, and proven equal by Parity Tests derived from the Windows test suite
-  (674 test methods + 356 InlineData + 80 fixtures; see `parity/TEST-MAP.md`).
+  (674 test methods + 612 InlineData cases by mechanical count (DC-191) + 80 fixtures; see `parity/TEST-MAP.md`).
 - **(C) Platform** — only OS-bound pieces (audio capture, Keystore, updates, OAuth browser
   flow, …) get Android-native implementations, behind the identical behaviour specs, with
   every divergence registered in TRANSFER-MAP §8. No silent divergence is permitted.
