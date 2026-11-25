@@ -141,25 +141,12 @@ dependencies {
     androidTestImplementation(libs.androidx.espresso.core)
 }
 
-// P8 (DC-205): copy the licence notices into the generated release-assets directory
-// wired into the release source set above, before the release assets are merged.
-// The packaged path inside the APK/AAB is assets/THIRD_PARTY_NOTICES.md.
-val copyThirdPartyNotices = tasks.register<Copy>("copyThirdPartyNotices") {
-    from(rootProject.file("parity/THIRD_PARTY_NOTICES.md"))
-    into(layout.buildDirectory.dir("generated/thirdPartyNotices"))
-}
-
-// DC-209: the generated notices directory reaches the release variant through
-// the AGP variant API, which wires BOTH the task dependency and the input
-// producer link. The first attempt (a plain sourceSets assets.srcDir plus a
-// tasks.matching dependsOn on mergeReleaseAssets) failed Gradle's task
-// validation in CI (run #350): "Property has implicit dependency" on
-// :app:copyThirdPartyNotices — a dependsOn alone does not declare the
-// input/output producer relationship the validator requires.
-extensions.configure<com.android.build.api.variant.ApplicationAndroidComponentsExtension> {
-    onVariants(selector().withBuildType("release")) { variant ->
-        variant.sources.assets?.addGeneratedSourceDirectory(copyThirdPartyNotices) { task ->
-            objects.directoryProperty().fileValue(task.destinationDir)
-        }
-    }
-}
+// P8 (DC-205, mechanism replaced by DC-211): the licence notices ship as a
+// STATIC asset of the release source set — app/src/release/assets/
+// THIRD_PARTY_NOTICES.md — merged by AGP's standard source-set mechanism into
+// assets/THIRD_PARTY_NOTICES.md of both the APK and the AAB. A JVM test
+// (LicenseComplianceTests) pins that file byte-identical to the single source
+// of truth at parity/THIRD_PARTY_NOTICES.md. The generated-directory
+// approaches (plain srcDir in DC-205's first form; the AGP variant API in
+// DC-209) were replaced after the downloaded CI artifact was inspected and
+// the notices were NOT in the APK — artifact truth over build-log claims.
